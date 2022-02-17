@@ -1,0 +1,2 @@
+# Trading
+Stock Trading Project
