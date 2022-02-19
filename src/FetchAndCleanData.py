@@ -14,7 +14,7 @@ Nifty_index_list = ['nifty50', 'niftynext50', 'nifty100', 'nifty200', 'nifty500'
                     'niftymidcap150', 'niftysmallcap50', 'niftysmallcap100', 'niftysmallcap250',
                     'niftylargemidcap250', 'niftymidsmallcap400', ]
 
-
+DATA_FLRD = r'C:\Users\ksdee\Documents\PersonalFinance\Trading\Trading_Data'
 def NSEStockList_All_Download(mypath):
     global Nifty_index_list
     index_path = mypath + os.path.sep + 'NSEData' + os.path.sep + 'index.csv'
@@ -51,6 +51,13 @@ def downlaodBhavCopy(mypath):
 
 def getLast10YrsAdjustedEODData(mypath):
     symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
+    existingData = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
+    existingData['Date'] = pd.to_datetime(existingData['Date'])
+    existingData = existingData.set_index('Date')
+    existingData = existingData.drop(columns=['correctedOpen','correctedClose','correctedHigh','correctedLow','Symbol_Date'])
+
+
+    symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
     correctedEODData = pd.concat([yf.download(sym + '.NS',
                                               start=dt.date.today().replace(year=dt.date.today().year - 10),
                                               end=dt.date.today(),
@@ -74,34 +81,51 @@ def getLast10YrsAdjustedEODData(mypath):
 
     logging.info('corrected data downloaded from Yahaoo ' + str(correctedEODData.shape))
 
-    rawData = pd.concat([npy.get_history(symbol=sym,
-                                         start=dt.date.today().replace(year=dt.date.today().year - 10),
-                                         end=dt.date.today()) for sym in symbols.SYMBOL])
-    rawData = rawData.reset_index()
+    start_date = existingData.index.max().date() + relativedelta(days=1)
+    end_date = dt.date.today()
+    rawData= pd.DataFrame()
+    for sym in symbols.SYMBOL:
+        logging.info('NSE hist data for %s '%sym)
+        rawData = rawData.append(npy.get_history(symbol=sym,
+                        start=start_date,
+                        end=end_date))
+    if rawData.shape[0] > 0 :
+        rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
 
-    rawData['Symbol_Date'] = rawData.apply(
-        lambda x: x['Symbol'] + '_' + dt.datetime.strftime(x['Date'], '%Y-%m-%d'), axis=1)
+        mergedData = pd.concat([existingData,rawData])
+        mergedData = mergedData.reset_index()
 
-    data = pd.merge(left=rawData,
-                    right=correctedEODData,
-                    left_on=['Symbol_Date'],
-                    right_on=['Symbol_Date'],
-                    how='left')
-    data = data.drop(columns=['Date_y', 'Symbol_y'], inplace=True)
-    data.rename(columns={'Date_x': 'Date',
-                         'Symbol_x': 'Symbol'}, inplace=True)
-    data.set_index('Date', inplace=True)
-    data['VolumePerTrade'] = data['Volume'] / data['Trades']
-    logging.info('NSE data and Yahoo corrected data ready for use ' + str(data.shape))
-    return data
+        mergedData['Symbol_Date'] = mergedData.apply(
+            lambda x: x['Symbol'] + '_' + dt.datetime.strftime(x['Date'], '%Y-%m-%d'), axis=1)
 
+        data = pd.merge(left=mergedData,
+                        right=correctedEODData,
+                        left_on=['Symbol_Date'],
+                        right_on=['Symbol_Date'],
+                        how='left')
+        data.drop(columns=['Date_y', 'Symbol_y'], inplace=True)
+        data.rename(columns={'Date_x': 'Date',
+                             'Symbol_x': 'Symbol'}, inplace=True)
+        data.set_index('Date', inplace=True)
+
+        newRowsAdded = data.shape[0] - existingData.shape[0]
+
+        logging.info('new rows added %d max date %s'%(newRowsAdded,data.index.max().strftime('%Y-%m-%d')))
+        data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
+        return data
+    else :
+        data = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
+        data['Date'] = pd.to_datetime(data['Date'])
+        data = data.set_index('Date')
+        logging.info('no new data found. max date %s '%(data.index.max().strftime('%Y-%m-%d')))
+        return data
 
 def getFeaturesOIDataForLast6Months(mypath):
     holidays = pd.read_excel(mypath + os.path.sep + 'NSEData' + os.path.sep + 'nse_holidays.xlsx')
     holidays.holidays = holidays.holidays.apply(lambda x: x.date())
     symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
     today = dt.datetime.today()
-    from_date = today - relativedelta(months=6)
+    from_date = today - relativedelta(months=3)
     dtList = list(pd.date_range(from_date, today, freq='B').to_pydatetime())
     expriyDf = pd.DataFrame()
     for dd in dtList:
@@ -175,22 +199,25 @@ def getFeaturesOIDataForLast6Months(mypath):
                                                               end=row['date'].date(),
                                                               futures=True,
                                                               expiry_date=row['month_after_next_month_exp_date'].date())
-            if len(current_month_features['Open Interest'].values) ==1:
+            if (len(current_month_features['Open Interest'].values) ==1) \
+                    and (len(next_month_features['Open Interest'].values)>0) \
+                    and (len(month_after_next_month_features['Open Interest'].values)>0):
                 oiData = oiData.append(pd.DataFrame({'Symbol': [symbol],
                                                      'Date': [row['date'].date()],
                                                      'cummOI': [current_month_features['Open Interest'].values[0] +
                                                                 next_month_features['Open Interest'].values[0] +
                                                                 month_after_next_month_features['Open Interest'].values[0]
                                                                 ]}))
+
     return oiData
 
+def generateData():
+    eodData = getLast10YrsAdjustedEODData(DATA_FLRD)
+    oiData = getFeaturesOIDataForLast6Months(DATA_FLRD)
+    oiData.to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv')
+
+    eodData
 
 
 
-expriyDf.to_csv(r'C:\Users\ksdee\Documents\PersonalFinance\Trading\Trading_Data\Temp\exp.csv')
 
-npy.get_history(symbol='AARTIIND',
-                                                              start=dt.date(2021,11,23),
-                                                              end=dt.date(2021,11,23),
-                                                              futures=True,
-                                                              expiry_date=dt.date(2021,12,30))
