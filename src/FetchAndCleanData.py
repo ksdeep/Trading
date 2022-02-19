@@ -15,6 +15,8 @@ Nifty_index_list = ['nifty50', 'niftynext50', 'nifty100', 'nifty200', 'nifty500'
                     'niftylargemidcap250', 'niftymidsmallcap400', ]
 
 DATA_FLRD = r'C:\Users\ksdee\Documents\PersonalFinance\Trading\Trading_Data'
+
+
 def NSEStockList_All_Download(mypath):
     global Nifty_index_list
     index_path = mypath + os.path.sep + 'NSEData' + os.path.sep + 'index.csv'
@@ -54,8 +56,8 @@ def getLast10YrsAdjustedEODData(mypath):
     existingData = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
     existingData['Date'] = pd.to_datetime(existingData['Date'])
     existingData = existingData.set_index('Date')
-    existingData = existingData.drop(columns=['correctedOpen','correctedClose','correctedHigh','correctedLow','Symbol_Date'])
-
+    existingData = existingData.drop(
+        columns=['correctedOpen', 'correctedClose', 'correctedHigh', 'correctedLow', 'Symbol_Date'])
 
     symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
     correctedEODData = pd.concat([yf.download(sym + '.NS',
@@ -83,16 +85,16 @@ def getLast10YrsAdjustedEODData(mypath):
 
     start_date = existingData.index.max().date() + relativedelta(days=1)
     end_date = dt.date.today()
-    rawData= pd.DataFrame()
+    rawData = pd.DataFrame()
     for sym in symbols.SYMBOL:
-        logging.info('NSE hist data for %s '%sym)
+        logging.info('NSE hist data for %s ' % sym)
         rawData = rawData.append(npy.get_history(symbol=sym,
-                        start=start_date,
-                        end=end_date))
-    if rawData.shape[0] > 0 :
+                                                 start=start_date,
+                                                 end=end_date))
+    if rawData.shape[0] > 0:
         rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
 
-        mergedData = pd.concat([existingData,rawData])
+        mergedData = pd.concat([existingData, rawData])
         mergedData = mergedData.reset_index()
 
         mergedData['Symbol_Date'] = mergedData.apply(
@@ -110,22 +112,25 @@ def getLast10YrsAdjustedEODData(mypath):
 
         newRowsAdded = data.shape[0] - existingData.shape[0]
 
-        logging.info('new rows added %d max date %s'%(newRowsAdded,data.index.max().strftime('%Y-%m-%d')))
+        logging.info('new rows added %d max date %s' % (newRowsAdded, data.index.max().strftime('%Y-%m-%d')))
         data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
         return data
-    else :
+    else:
         data = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
         data['Date'] = pd.to_datetime(data['Date'])
         data = data.set_index('Date')
-        logging.info('no new data found. max date %s '%(data.index.max().strftime('%Y-%m-%d')))
+        logging.info('no new data found. max date %s ' % (data.index.max().strftime('%Y-%m-%d')))
         return data
 
+
 def getFeaturesOIDataForLast6Months(mypath):
+    existingOIData = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv')
+    existingOIData['Date'] = pd.to_datetime(existingOIData['Date'])
     holidays = pd.read_excel(mypath + os.path.sep + 'NSEData' + os.path.sep + 'nse_holidays.xlsx')
     holidays.holidays = holidays.holidays.apply(lambda x: x.date())
     symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
     today = dt.datetime.today()
-    from_date = today - relativedelta(months=3)
+    from_date = today - relativedelta(months=6)
     dtList = list(pd.date_range(from_date, today, freq='B').to_pydatetime())
     expriyDf = pd.DataFrame()
     for dd in dtList:
@@ -173,17 +178,20 @@ def getFeaturesOIDataForLast6Months(mypath):
                                                      'next_month_exp_date': [expiry_date_next_month],
                                                      'month_after_next_month_exp_date': [
                                                          expiry_date_month_after_next_month]}))
+    expriyDf = expriyDf.loc[~expriyDf.date.apply(lambda x: x.strftime('%Y-%m-%d')).isin(
+        existingOIData.Date.apply(lambda x: x.strftime('%Y-%m-%d'))), :]
+
     logging.info(
         'experiy to be feteched for %d dates ' % (expriyDf.shape[0]))
     oiData = pd.DataFrame()
     for symbol in symbols.SYMBOL:
         for _, row in expriyDf.iterrows():
             logging.info('fetching features data for %s for date %s exp dates %s %s %s' % (
-            symbol,
-            dt.datetime.strftime(row['date'].date(), '%Y-%m-%d'),
-            dt.datetime.strftime(row['current_exp_date'].date(), '%Y-%m-%d'),
-            dt.datetime.strftime(row['next_month_exp_date'].date(), '%Y-%m-%d'),
-            dt.datetime.strftime(row['month_after_next_month_exp_date'].date(), '%Y-%m-%d')))
+                symbol,
+                dt.datetime.strftime(row['date'].date(), '%Y-%m-%d'),
+                dt.datetime.strftime(row['current_exp_date'].date(), '%Y-%m-%d'),
+                dt.datetime.strftime(row['next_month_exp_date'].date(), '%Y-%m-%d'),
+                dt.datetime.strftime(row['month_after_next_month_exp_date'].date(), '%Y-%m-%d')))
             current_month_features = npy.get_history(symbol=symbol,
                                                      start=row['date'].date(),
                                                      end=row['date'].date(),
@@ -199,25 +207,73 @@ def getFeaturesOIDataForLast6Months(mypath):
                                                               end=row['date'].date(),
                                                               futures=True,
                                                               expiry_date=row['month_after_next_month_exp_date'].date())
-            if (len(current_month_features['Open Interest'].values) ==1) \
-                    and (len(next_month_features['Open Interest'].values)>0) \
-                    and (len(month_after_next_month_features['Open Interest'].values)>0):
+            if (len(current_month_features['Open Interest'].values) == 1) \
+                    and (len(next_month_features['Open Interest'].values) > 0) \
+                    and (len(month_after_next_month_features['Open Interest'].values) > 0):
                 oiData = oiData.append(pd.DataFrame({'Symbol': [symbol],
                                                      'Date': [row['date'].date()],
                                                      'cummOI': [current_month_features['Open Interest'].values[0] +
                                                                 next_month_features['Open Interest'].values[0] +
-                                                                month_after_next_month_features['Open Interest'].values[0]
+                                                                month_after_next_month_features['Open Interest'].values[
+                                                                    0]
                                                                 ]}))
 
-    return oiData
+    if oiData.shape[0]>0:
+        newOi = existingOIData.append(oiData)
+        newOi.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',index=False)
+        return  newOi
+    else :
+        return existingOIData
+
+
+def getFIIInvestmentData(mypath):
+    existingfii = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
+    endDate = dt.date.today()
+    startDate = endDate - relativedelta(months=6)
+    dtSrs = pd.Series(pd.date_range(startDate, endDate, freq='SM')).apply(lambda x: x.strftime('%b%d%Y'))
+    dtSrsLong = pd.Series(pd.date_range(startDate, endDate, freq='SM')).apply(lambda x: x.strftime('%B%d%Y'))
+    dateDf = pd.DataFrame({'shrtDt': dtSrs, 'longDt': dtSrsLong})
+    data = pd.DataFrame()
+
+    for _, dd in dateDf.iterrows():
+        urlShrt = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
+        dd['shrtDt'])
+        urlLng = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
+        dd['longDt'])
+        if data.shape[0] == 0:
+            try:
+                data = pd.read_html(urlShrt)[0].iloc[3:, [1, 32]]
+                data.columns = ['Sector', dd['shrtDt']]
+
+            except:
+                data = pd.read_html(urlLng)[0].iloc[3:, [1, 32]]
+                data.columns = ['Sector', dd['longDt']]
+
+        else:
+            try:
+                temp = pd.read_html(urlShrt)[0].iloc[3:, [1, 32]]
+                temp.columns = ['Sector', dd['shrtDt']]
+            except:
+                temp = pd.read_html(urlLng)[0].iloc[3:, [1, 32]]
+                temp.columns = ['Sector', dd['longDt']]
+            data = pd.merge(left=data,
+                            right=temp,
+                            left_on='Sector',
+                            right_on='Sector',
+                            how='outer')
+    if data.shape[0]>0:
+        data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv',index=False)
+        return data
+    else:
+        existingfii
+
+
+
 
 def generateData():
     eodData = getLast10YrsAdjustedEODData(DATA_FLRD)
     oiData = getFeaturesOIDataForLast6Months(DATA_FLRD)
-    oiData.to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv')
-
-    eodData
-
-
+    oiData.to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',index=False)
+    getFIIInvestmentData(DATA_FLRD)
 
 
