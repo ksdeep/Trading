@@ -227,7 +227,10 @@ def getFeaturesOIDataForLast6Months(mypath):
 
 
 def getFIIInvestmentData(mypath):
-    existingfii = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
+    try:
+        existingfii = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
+    except:
+        existingfii = pd.DataFrame()
     endDate = dt.date.today()
     startDate = endDate - relativedelta(months=6)
     dtSrs = pd.Series(pd.date_range(startDate, endDate, freq='SM')).apply(lambda x: x.strftime('%b%d%Y'))
@@ -274,6 +277,6 @@ def generateData():
     eodData = getLast10YrsAdjustedEODData(DATA_FLRD)
     oiData = getFeaturesOIDataForLast6Months(DATA_FLRD)
     oiData.to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',index=False)
-    getFIIInvestmentData(DATA_FLRD)
+    fiiData = getFIIInvestmentData(DATA_FLRD)
 
 
