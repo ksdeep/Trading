@@ -3,10 +3,12 @@ import pandas as pd
 import yfinance as yf
 from pynse import *
 import nsepy as npy
-import os
 from dateutil.relativedelta import relativedelta, TH
 import datetime as dt
 import os
+import talib as ta
+import matplotlib.pyplot as plot
+import mplfinance as mpf
 
 logging.basicConfig(format='Date-Time : %(asctime)s : Line No. : %(lineno)d - %(message)s', level=logging.INFO)
 
@@ -92,7 +94,7 @@ def getLast10YrsAdjustedEODData(mypath):
                                                  start=start_date,
                                                  end=end_date))
     if rawData.shape[0] > 0:
-        rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
+        #rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
 
         mergedData = pd.concat([existingData, rawData])
         mergedData = mergedData.reset_index()
@@ -276,7 +278,32 @@ def getFIIInvestmentData(mypath):
 def generateData():
     eodData = getLast10YrsAdjustedEODData(DATA_FLRD)
     oiData = getFeaturesOIDataForLast6Months(DATA_FLRD)
-    oiData.to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',index=False)
     fiiData = getFIIInvestmentData(DATA_FLRD)
+
+
+def whereAreFiiInvesting(myPath):
+    def masscenter(arr):
+        return (arr[1] - arr[0])*100/arr[0]
+
+    fiiData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
+    fiiData.set_index('Sector', inplace=True)
+
+    changFii = fiiData.rolling(window=2,axis=1).apply(masscenter,raw=True)
+
+    changFiiDesc = changFii.iloc[0:changFii.shape[0] - 1, :].sort_values(changFii.columns[len(changFii.columns) - 1], ascending=False)
+    fiiData.iloc[0:changFii.shape[0] - 1, :].to_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fiiPlot.csv')
+    changFiiDesc.to_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fiiChangePlot.csv')
+
+def analzeStcocsBasedOIDelevery(myPath):
+    eodData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv',low_memory=False)
+    oiData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',low_memory=False)
+    stockDesc = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'index.csv', low_memory=False)
+
+    for script in eodData.Symbol.unique():
+        eodDScript = eodData.script
+
+
+
+
 
 
