@@ -1,0 +1,54 @@
+//------------------------------------------------------
+//
+//  Formula Name:    Range Breakout Exploration
+//  Author/Uploader: Trading Tuitions
+//  E-mail:          support@tradingtuitions.com
+//  Website:         www.tradingtuitions.com
+//------------------------------------------------------
+
+_SECTION_BEGIN("Range Breakout Exploration");
+
+SetChartOptions(0,chartShowArrows|chartShowDates);
+
+Plot( Close, "Price", colorWhite, styleCandle );
+
+Filter = Close > 0;
+
+AddColumn(Open,"Open");
+AddColumn(High,"High");
+AddColumn(Low,"Low");
+AddColumn(Close,"Close");
+
+range = Min(H-O,O-L);
+AddColumn(range,"Day's Range");
+
+Avg5DayRange = MA(Ref(range,-1),5);
+AddColumn(Avg5DayRange,"Average 5 Day's Range");
+
+BuyAbove = O+Avg5DayRange;
+SellBelow = O-Avg5DayRange;
+
+AddColumn(BuyAbove,"Buy Above");
+AddColumn(SellBelow,"Sell Below");
+AddColumn(SellBelow,"Buy SL");
+AddColumn(BuyAbove,"Sell SL");
+
+BuyTGT1 = BuyAbove + Avg5DayRange;
+BuyTGT2 = BuyTGT1 + Avg5DayRange;
+BuyTGT3 = BuyTGT2 + Avg5DayRange;
+
+SellTGT1 = SellBelow - Avg5DayRange;
+SellTGT2 = SellTGT1 - Avg5DayRange;
+SellTGT3 = SellTGT2	 - Avg5DayRange;
+
+AddColumn(BuyTGT1,"BuyTGT1");
+AddColumn(BuyTGT2,"BuyTGT2");
+AddColumn(BuyTGT3,"BuyTGT3");
+
+AddColumn(SellTGT1,"SellTGT1");
+AddColumn(SellTGT2,"SellTGT2");
+AddColumn(SellTGT3,"SellTGT3");
+
+SetSortColumns( -2 ); 
+
+_SECTION_END();

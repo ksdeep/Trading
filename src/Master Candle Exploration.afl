@@ -1,0 +1,37 @@
+//------------------------------------------------------
+//
+//  Formula Name:    Master Candle Exploration AFL
+//  Author/Uploader: Trading Tuitions
+//  E-mail:          support@tradingtuitions.com
+//  Website:         www.tradingtuitions.com
+//------------------------------------------------------
+
+_SECTION_BEGIN("Master Candle Exploration");
+
+MC = H>Ref(H,1) AND H>Ref(H,2) AND H>Ref(H,3) AND H>Ref(H,4) AND L<Ref(L,1) AND L<Ref(L,2) AND L<Ref(L,3) AND L<Ref(L,4);
+
+MCHigh = ValueWhen(MC,H);
+MCLow = ValueWhen(MC,L);
+MCRange = MCHigh-MCLow;
+
+BreakoutCandleCond = (Ref(MC,-5) OR Ref(MC,-6) OR Ref(MC,-7));
+
+LongBreakout =  BreakoutCandleCond AND H>MCHigh;
+ShortBreakout = BreakoutCandleCond AND L<MCLow;
+
+LongBreakoutStr = WriteIF(LongBreakout,"YES","NO");
+ShortBreakoutStr = WriteIF(ShortBreakout,"YES","NO");
+  
+Filter = LongBreakout OR ShortBreakout;
+ 
+AddColumn(Close, "Close", 1.2,colorBlack,colorLightGrey,width=100);
+AddColumn(Open, "Open", 1.2,colorBlack,colorLightGrey,width=100);
+AddColumn(High, "High", 1.2,colorBlack,colorLightGrey,width=100);
+AddColumn(Low, "Low", 1.2,colorBlack,colorLightGrey,width=100);
+AddColumn(MCHigh, "Master Candle High", 1.2, colorBlack, colorLightOrange,200);
+AddColumn(MCLow, "Master Candle Low", 1.2, colorBlack, colorAqua,200);
+AddColumn(MCRange, "Master candle Range", 1.2, colorBlack, colorPaleTurquoise,200);
+AddTextColumn(LongBreakoutStr, "Long Breakout",format=1.2,colorWhite,colorGreen);
+AddTextColumn(ShortBreakoutStr, "Short Breakout",format=1.2,colorWhite,colorRed);
+
+_SECTION_END();

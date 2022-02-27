@@ -1,0 +1,49 @@
+_SECTION_BEGIN("Price");
+SetChartOptions(0,chartShowArrows|chartShowDates);
+_N(Title = StrFormat("{{NAME}} - {{INTERVAL}} {{DATE}} {{OHLCX}} Vol %.0f {{VALUES}}", V ));
+Plot( C, "Close", ParamColor("Color", colorDefault ), styleNoTitle | ParamStyle("Style") | GetPriceStyle() ); 
+_SECTION_END();
+
+
+
+_SECTION_BEGIN("BBands");
+P = ParamField("Price field",-1);
+Periods = Param("Periods", 13, 2, 100, 1 );
+Width = Param("Width", 2, 0, 10, 0.05 );
+Color = ParamColor("Color", colorLightGrey );
+Color = ColorBlend( Color,  GetChartBkColor(), 0.5 );
+Style = ParamStyle("Style", styleLine | styleNoLabel ) | styleNoRescale;;
+Plot( bbt = BBandTop( P, Periods, Width ), "BBTop" + _PARAM_VALUES(), Color, Style ); 
+Plot( bbb = BBandBot( P, Periods, Width ), "BBBot" + _PARAM_VALUES(), Color, Style ); 
+PlotOHLC( bbt, bbt, bbb, bbb, "", ColorBlend( Color, GetChartBkColor(), 0.7 ), styleNoLabel | styleCloud | styleNoRescale, Null, Null, Null, -1 );
+_SECTION_END();
+
+_SECTION_BEGIN("Volume");
+Color = ParamColor("Color", ColorRGB( 128, 128, 192 ) );
+Plot( Volume, _DEFAULT_NAME(), ColorBlend( Color, GetChartBkColor(), 0.5  ), styleNoTitle | ParamStyle( "Style", styleHistogram | styleOwnScale | styleThick | styleNoLabel, maskHistogram  ), 2 );
+_SECTION_END();
+
+
+ind_macd = MACD(13,21);
+sig_macd = Signal(13,21,9);
+
+
+ind_rsi = RSI(13);
+
+ind_atr = ATR(13);
+rel_strength = RelStrength("NIFTY",1);
+rel_strength_upwards = rel_strength > MA(rel_strength,5);
+
+
+
+
+ConvLine = ( HHV( H, 9) + LLV( L, 9) )/2;
+BaseLine = ( HHV( H, 26) + LLV( L, 26) )/2;
+
+LeadSpanA = (ConvLine + BaseLine)/2;
+LeadSpanB = (HHV( H, 52) + LLV(L, 52))/2;
+LagSpan = Ref( C, 26);
+
+PlotOHLC (LeadSpanA,LeadSpanA,LeadSpanB,LeadSpanB,"Cloud",IIf(LeadSpanA>LeadSpanB,ParamColor("Span1 Color", ColorRGB(206,255,0)  ),ParamColor("Span2 Color",ColorRGB(255,160,122))),styleCloud);
+
+
