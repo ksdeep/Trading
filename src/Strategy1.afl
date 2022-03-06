@@ -1,49 +1,136 @@
-_SECTION_BEGIN("Price");
-SetChartOptions(0,chartShowArrows|chartShowDates);
-_N(Title = StrFormat("{{NAME}} - {{INTERVAL}} {{DATE}} {{OHLCX}} Vol %.0f {{VALUES}}", V ));
-Plot( C, "Close", ParamColor("Color", colorDefault ), styleNoTitle | ParamStyle("Style") | GetPriceStyle() ); 
+_SECTION_BEGIN( "Price" );
+SetChartOptions( 0, chartShowArrows | chartShowDates );
+_N( Title = StrFormat( "{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ) );
+Plot( C, "Close", ParamColor( "Color", colorDefault ), styleNoTitle | ParamStyle( "Style" ) | GetPriceStyle() );
 _SECTION_END();
 
+Filter = Close > 0;
+
+/* ichioku analysis Start */
+ConvLine = ( HHV( H, 9 ) + LLV( L, 9 ) ) / 2;
+BaseLine = ( HHV( H, 26 ) + LLV( L, 26 ) ) / 2;
+LeadSpanA = ( ConvLine + BaseLine ) / 2;
+LeadSpanB = ( HHV( H, 52 ) + LLV( L, 52 ) ) / 2;
+LagSpan = Ref( C, 26 );
+
+buyIchimoku = L > LeadSpanA AND L > LeadSpanB AND ConvLine > BaseLine;
+selIchimoku = Cross( BaseLine , ConvLine );
+
+printf( "Ichioku buy =%f sel =%f\n", buyIchimoku, selIchimoku );
+/* ichioku analysis End */
+
+/* MA slope based analysis Start */
+MAS = MA( C, 20 );
+MAM = MA( C, 50 );
+MAL = MA( C, 100 );
 
 
-_SECTION_BEGIN("BBands");
-P = ParamField("Price field",-1);
-Periods = Param("Periods", 13, 2, 100, 1 );
-Width = Param("Width", 2, 0, 10, 0.05 );
-Color = ParamColor("Color", colorLightGrey );
-Color = ColorBlend( Color,  GetChartBkColor(), 0.5 );
-Style = ParamStyle("Style", styleLine | styleNoLabel ) | styleNoRescale;;
-Plot( bbt = BBandTop( P, Periods, Width ), "BBTop" + _PARAM_VALUES(), Color, Style ); 
-Plot( bbb = BBandBot( P, Periods, Width ), "BBBot" + _PARAM_VALUES(), Color, Style ); 
-PlotOHLC( bbt, bbt, bbb, bbb, "", ColorBlend( Color, GetChartBkColor(), 0.7 ), styleNoLabel | styleCloud | styleNoRescale, Null, Null, Null, -1 );
-_SECTION_END();
+TS = LinRegSlope( MAS, 2 ); // TL = Trend Long
+TM = LinRegSlope( MAM, 2 ); // TM = Trend Medium
+TL = LinRegSlope( MAL, 2 ); // TS = Trend Short
 
-_SECTION_BEGIN("Volume");
-Color = ParamColor("Color", ColorRGB( 128, 128, 192 ) );
-Plot( Volume, _DEFAULT_NAME(), ColorBlend( Color, GetChartBkColor(), 0.5  ), styleNoTitle | ParamStyle( "Style", styleHistogram | styleOwnScale | styleThick | styleNoLabel, maskHistogram  ), 2 );
-_SECTION_END();
+TLL = IIf( TL > 0, True, False );
+TMM = IIf( TM > 0, True, False );
+TSS = IIf( TS > 0, True, False );
+
+buySlope = MAS > MAM AND MAM > MAL AND TSS > 0 AND Ref( TSS, -1 ) == 1 AND TMM == 1 AND Ref( TMM, -1 ) == 1 AND TLL == 1;
+sellSlope = TSS == 0 OR TMM == 0 OR TLL == 0 ;
+
+printf( "sellSlope buy =%f sel =%f\n", buySlope, sellSlope );
+/* MA slope based analysis End */
+
+/* Hammer and Inside day start */
+L1 = Ref( L, -1 );
+L2 = Ref( L, -2 );
+L3 = Ref( L, -3 );
+L4 = Ref( L, -4 );
+O1 = Ref( O, -1 );
+O2 = Ref( O, -2 );
+O3 = Ref( O, -3 );
+O4 = Ref( O, -4 );
+H1 = Ref( H, -1 );
+H2 = Ref( H, -2 );
+H3 = Ref( H, -3 );
+H4 = Ref( H, -4 );
+C1 = Ref( C, -1 );
+C2 = Ref( C, -2 );
+C3 = Ref( C, -3 );
+C4 = Ref( C, -4 );
+
+dhammertrend = ( L < L1 ) AND( L1 < L2 )AND( L2 < L3 ) AND( L3 < L4 );
+uhangingmantrend = ( H > H1 ) AND( H1 > H2 )AND( H2 > H3 ) AND( H3 > H4 );
+Doji  = ( abs( O - C ) <= ( ( H - L ) * 0.1 ) );
+Hammer  = ( ( ( H - L ) > 3 * ( O - C ) ) AND( ( C - L ) / ( .001 + H - L ) > 0.6 ) AND( ( O - L ) / ( .001 + H - L ) > 0.6 ) AND dhammertrend AND NOT Doji );
 
 
-ind_macd = MACD(13,21);
-sig_macd = Signal(13,21,9);
+Harami =
+    IIf( O > C AND O1 > C1 AND O<O1 AND C>C1, 1,
+         IIf( O > C AND C1 > O1 AND C > O1 AND O < C1, 1,
+              IIf( C > O AND C1 > O1 AND C<C1 AND O>O1, 1,
+                   IIf( C > O AND O1 > C1 AND O > C1 AND C < O1, 1, 0 ) ) ) );
+
+LongBlackCandle = ( O > C AND( O - C ) / ( .001 + H - L ) > .6 );
+LongWhiteCandle  = ( ( C > O ) AND( ( C - O ) / ( .001 + H - L ) > .6 ) );
+
+BullishHarami = ( Harami AND( O1 > C1 ) AND Ref( LongBlackCandle, -1 ) AND NOT LongWhiteCandle );
+
+dtrend = ( L1 < L2 )AND( L2 < L3 ) AND( L3 < L4 );
+utrend = ( H1 > H2 )AND( H2 > H3 ) AND( H3 > H4 );
+BullishEngulfing  = ( LongWhiteCandle AND dtrend  AND( O1 > C1 ) AND( C > O ) AND( C >= O1 ) AND( C1 >= O ) AND( ( C - O ) > ( O1 - C1 ) ) );
+
+MHT =  HHV( H, 5 ) == H;
+BearishHarami = ( ( C1 > O1 ) AND( O > C ) AND( O <= C1 ) AND( O1 <= C ) AND( ( O - C ) < ( C1 - O1 ) ) );
+HangingMan  = ( ( ( H - L ) > 4 * ( O - C ) ) AND( ( C - L ) / ( .001 + H - L ) >= 0.75 ) AND( ( O - L ) / ( .001 + H - L ) >= 0.75 ) AND uhangingmantrend AND NOT Doji );
+BearishEngulfing  = ( MHT AND utrend  AND LongBlackCandle AND( C1 > O1 ) AND( O > C ) AND( O >= C1 ) AND( O1 >= C ) AND( ( O - C ) > ( C1 - O1 ) ) );
 
 
-ind_rsi = RSI(13);
+candlStocBuy = Hammer OR BullishHarami OR BullishEngulfing;
+candlStocSell = HangingMan OR BearishHarami OR BearishEngulfing;
 
-ind_atr = ATR(13);
-rel_strength = RelStrength("NIFTY",1);
-rel_strength_upwards = rel_strength > MA(rel_strength,5);
+printf( "candel buy =%f sel =%f\n", candlStocBuy, candlStocSell );
+/* Hammer and Inside day  */
+/* macd with uptrend using EMA 5,21,200 */
+weekly_ma = EMA( C, 5 );
+monthly_ma = EMA( C, 21 );
+yearly_ma = EMA( C, 200 );
+
+Plot( weekly_ma, "5 day EMA", colorYellow, styleLine | styleThick );
+Plot( monthly_ma, "21 day EMA", colorBlue, styleLine | styleThick );
+Plot( yearly_ma, "200 day EMA", colorRed, styleLine | styleThick );
+
+daily_uptrend = weekly_ma > monthly_ma AND monthly_ma  > yearly_ma;
+daily_downtrend = NOT daily_uptrend;
+
+ind_macd = MACD( 13, 21 );
+sig_macd = Signal( 13, 21, 9 );
+
+macdBuy = daily_uptrend AND ind_macd > sig_macd;
+macdSell = daily_downtrend OR Cross( sig_macd, ind_macd );
+
+printf( "MACD buy =%f sel =%f\n", macdBuy, macdSell );
+/* macd with uptrend using EMA 5,21,200 */
+/*bb strategy start*/
+bbtop2 = BBandTop( C, 13, 2 );
+bbBtm2 = BBandBot( C, 13, 2 );
+bbtop1 = BBandTop( C, 13, 1 );
+bbBtm1 = BBandBot( C, 13, 1 );
+//bbTopBuySignal = ( C > bbtop1 AND H < bbtop2 );
+//bbTopBuySignal = bbTopBuySignal AND Ref( C, -1 ) > Ref( bbtop1, -1 ) AND Ref( H, -1 ) < Ref( bbtop2, -1 );
+//bbTopBuySignal = bbTopBuySignal AND Ref( C, -2 ) > Ref( bbtop1, -2 ) AND Ref( H, -2 ) < Ref( bbtop2, -2 );
+bbBuy = daily_uptrend AND  L < bbBtm2;
+bbSell = daily_downtrend OR H > bbtop2;
+printf( "BB Band buy =%f sel =%f\n", bbBuy, bbSell );
+/*bb strategy end*/
+
+ttlBuy = bbBuy + macdBuy + candlStocBuy + buySlope + buyIchimoku;
+ttlSel = bbSell + macdSell + candlStocSell + sellSlope + selIchimoku;
+
+AddColumn( ttlBuy, "Buy Strength", 1.2, colorBlack, colorLightGrey, width = 100 );
+AddColumn( ttlSel, "Sel Strength", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( buyIchimoku, "Buy Ichimoku", 1.2, colorBlack, colorLightGrey, width = 100 );
+AddColumn( selIchimoku, "Sel Ichimoku", 1.2, colorBlack, colorLightGrey, width = 100 );
 
 
-
-
-ConvLine = ( HHV( H, 9) + LLV( L, 9) )/2;
-BaseLine = ( HHV( H, 26) + LLV( L, 26) )/2;
-
-LeadSpanA = (ConvLine + BaseLine)/2;
-LeadSpanB = (HHV( H, 52) + LLV(L, 52))/2;
-LagSpan = Ref( C, 26);
-
-PlotOHLC (LeadSpanA,LeadSpanA,LeadSpanB,LeadSpanB,"Cloud",IIf(LeadSpanA>LeadSpanB,ParamColor("Span1 Color", ColorRGB(206,255,0)  ),ParamColor("Span2 Color",ColorRGB(255,160,122))),styleCloud);
 
 
