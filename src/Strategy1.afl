@@ -1,3 +1,4 @@
+
 _SECTION_BEGIN( "Price" );
 SetChartOptions( 0, chartShowArrows | chartShowDates );
 _N( Title = StrFormat( "{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ) );
@@ -13,7 +14,7 @@ LeadSpanA = ( ConvLine + BaseLine ) / 2;
 LeadSpanB = ( HHV( H, 52 ) + LLV( L, 52 ) ) / 2;
 LagSpan = Ref( C, 26 );
 
-buyIchimoku = L > LeadSpanA AND L > LeadSpanB AND ConvLine > BaseLine;
+buyIchimoku = L > LeadSpanA AND L > LeadSpanB AND Cross( ConvLine , BaseLine );
 selIchimoku = Cross( BaseLine , ConvLine );
 
 printf( "Ichioku buy =%f sel =%f\n", buyIchimoku, selIchimoku );
@@ -57,12 +58,14 @@ C2 = Ref( C, -2 );
 C3 = Ref( C, -3 );
 C4 = Ref( C, -4 );
 
+greenCandel = C > O ;
 dhammertrend = ( L < L1 ) AND( L1 < L2 )AND( L2 < L3 ) AND( L3 < L4 );
 uhangingmantrend = ( H > H1 ) AND( H1 > H2 )AND( H2 > H3 ) AND( H3 > H4 );
 Doji  = ( abs( O - C ) <= ( ( H - L ) * 0.1 ) );
 Hammer  = ( ( ( H - L ) > 3 * ( O - C ) ) AND( ( C - L ) / ( .001 + H - L ) > 0.6 ) AND( ( O - L ) / ( .001 + H - L ) > 0.6 ) AND dhammertrend AND NOT Doji );
-
-
+smallotherSideWick = IIf( greenCandel, ( ( O - L ) / ( 0.001 + H - L ) < 0.05 ), ( ( H - O ) / ( 0.001 + H - L ) < 0.05 ) );
+Hammer = Hammer AND smallotherSideWick;
+//printf("%f smallotherSideWick %f\n",greenCandel,smallotherSideWick);
 Harami =
     IIf( O > C AND O1 > C1 AND O<O1 AND C>C1, 1,
          IIf( O > C AND C1 > O1 AND C > O1 AND O < C1, 1,
@@ -83,9 +86,9 @@ BearishHarami = ( ( C1 > O1 ) AND( O > C ) AND( O <= C1 ) AND( O1 <= C ) AND( ( 
 HangingMan  = ( ( ( H - L ) > 4 * ( O - C ) ) AND( ( C - L ) / ( .001 + H - L ) >= 0.75 ) AND( ( O - L ) / ( .001 + H - L ) >= 0.75 ) AND uhangingmantrend AND NOT Doji );
 BearishEngulfing  = ( MHT AND utrend  AND LongBlackCandle AND( C1 > O1 ) AND( O > C ) AND( O >= C1 ) AND( O1 >= C ) AND( ( O - C ) > ( C1 - O1 ) ) );
 
-
-candlStocBuy = Hammer OR BullishHarami OR BullishEngulfing;
-candlStocSell = HangingMan OR BearishHarami OR BearishEngulfing;
+stoD = StochD( 4, 1, 1 );
+candlStocBuy = stoD > 20 AND Hammer OR BullishHarami OR BullishEngulfing;
+candlStocSell = stoD < 80 AND HangingMan OR BearishHarami OR BearishEngulfing;
 
 printf( "candel buy =%f sel =%f\n", candlStocBuy, candlStocSell );
 /* Hammer and Inside day  */
@@ -94,9 +97,9 @@ weekly_ma = EMA( C, 5 );
 monthly_ma = EMA( C, 21 );
 yearly_ma = EMA( C, 200 );
 
-Plot( weekly_ma, "5 day EMA", colorYellow, styleLine | styleThick );
-Plot( monthly_ma, "21 day EMA", colorBlue, styleLine | styleThick );
-Plot( yearly_ma, "200 day EMA", colorRed, styleLine | styleThick );
+Plot( weekly_ma, "5 day EMA", colorYellow, styleDashed );
+Plot( monthly_ma, "21 day EMA", colorBlue, styleDashed );
+Plot( yearly_ma, "200 day EMA", colorBlueGrey, styleDashed );
 
 daily_uptrend = weekly_ma > monthly_ma AND monthly_ma  > yearly_ma;
 daily_downtrend = NOT daily_uptrend;
@@ -104,8 +107,8 @@ daily_downtrend = NOT daily_uptrend;
 ind_macd = MACD( 13, 21 );
 sig_macd = Signal( 13, 21, 9 );
 
-macdBuy = daily_uptrend AND ind_macd > sig_macd;
-macdSell = daily_downtrend OR Cross( sig_macd, ind_macd );
+macdBuy =  Cross( ind_macd, sig_macd );
+macdSell = Cross( sig_macd, ind_macd );
 
 printf( "MACD buy =%f sel =%f\n", macdBuy, macdSell );
 /* macd with uptrend using EMA 5,21,200 */
@@ -114,23 +117,377 @@ bbtop2 = BBandTop( C, 13, 2 );
 bbBtm2 = BBandBot( C, 13, 2 );
 bbtop1 = BBandTop( C, 13, 1 );
 bbBtm1 = BBandBot( C, 13, 1 );
+ind_rsi = RSI( 13 );
 //bbTopBuySignal = ( C > bbtop1 AND H < bbtop2 );
 //bbTopBuySignal = bbTopBuySignal AND Ref( C, -1 ) > Ref( bbtop1, -1 ) AND Ref( H, -1 ) < Ref( bbtop2, -1 );
 //bbTopBuySignal = bbTopBuySignal AND Ref( C, -2 ) > Ref( bbtop1, -2 ) AND Ref( H, -2 ) < Ref( bbtop2, -2 );
-bbBuy = daily_uptrend AND  L < bbBtm2;
-bbSell = daily_downtrend OR H > bbtop2;
+bbBuy =  L < bbBtm2 AND ind_rsi < 30;
+bbSell = H > bbtop2 AND ind_rsi > 70;
 printf( "BB Band buy =%f sel =%f\n", bbBuy, bbSell );
 /*bb strategy end*/
+/*cci strategy*/
+shrt_cci = CCI( 21 );
+TimeFrameSet( inWeekly );
+lng_cci = CCI( 13 );
+TimeFrameRestore();
 
-ttlBuy = bbBuy + macdBuy + candlStocBuy + buySlope + buyIchimoku;
-ttlSel = bbSell + macdSell + candlStocSell + sellSlope + selIchimoku;
+buyCCI = lng_cci > -100 AND Cross( shrt_cci , -100 ) 	;
+sellCCI = lng_cci > 100 OR shrt_cci > 100;
 
-AddColumn( ttlBuy, "Buy Strength", 1.2, colorBlack, colorLightGrey, width = 100 );
+printf( "CCI buy =%f sel =%f\n", buyCCI, sellCCI );
+/*cci strategy end*/
+/*super trend */
+Factor = 8;
+Pd = 13;
+
+Up = ( H + L ) / 2 + ( Factor*ATR( Pd ) );
+Dn = ( H + L ) / 2 - ( Factor*ATR( Pd ) );
+iATR = ATR( Pd );
+TrendUp = TrendDown = Null;
+trend[0] = 1;
+changeOfTrend = 0;
+flag = flagh = 0;
+
+for( i = 1; i < BarCount - 1; i++ )
+{
+    TrendUp[i] = Null;
+    TrendDown[i] = Null;
+
+    trend[i] = 1;
+
+
+    if( Close[i] > Up[i - 1] )
+    {
+        trend[i] = 1;
+
+        if( trend[i - 1] == -1 ) changeOfTrend = 1;
+
+    }
+    else
+        if( Close[i] < Dn[i - 1] )
+        {
+            trend[i] = -1;
+
+            if( trend[i - 1] == 1 ) changeOfTrend = 1;
+        }
+        else
+            if( trend[i - 1] == 1 )
+            {
+                trend[i] = 1;
+                changeOfTrend = 0;
+            }
+            else
+                if( trend[i - 1] == -1 )
+                {
+                    trend[i] = -1;
+                    changeOfTrend = 0;
+                }
+
+    if( trend[i] < 0 && trend[i - 1] > 0 )
+    {
+        flag = 1;
+    }
+    else
+    {
+        flag = 0;
+    }
+
+    if( trend[i] > 0 && trend[i - 1] < 0 )
+    {
+        flagh = 1;
+    }
+    else
+    {
+        flagh = 0;
+    }
+
+    if( trend[i] > 0 && Dn[i] < Dn[i - 1] )
+    {
+        Dn[i] = Dn[i - 1];
+    }
+
+    if( trend[i] < 0 && Up[i] > Up[i - 1] )
+    {
+        Up[i] = Up[i - 1];
+    }
+
+    if( flag == 1 )
+    {
+        Up[i] = ( H[i] + L[i] ) / 2 + ( Factor * iATR[i] );;
+    }
+
+    if( flagh == 1 )
+    {
+        Dn[i] = ( H[i] + L[i] ) / 2 - ( Factor * iATR[i] );;
+    }
+
+    if( trend[i] == 1 )
+    {
+        TrendUp[i] = Dn[i];
+
+        if( changeOfTrend == 1 )
+        {
+            TrendUp[i - 1] = TrendDown[i - 1];
+            changeOfTrend = 0;
+        }
+    }
+    else
+        if( trend[i] == -1 )
+        {
+            TrendDown[i] = Up[i];
+
+            if( changeOfTrend == 1 )
+            {
+                TrendDown[i - 1] = TrendUp[i - 1];
+                changeOfTrend = 0;
+            }
+        }
+}
+
+Plot( TrendUp, "Trend", colorGreen );
+Plot( TrendDown, "Down", colorRed );
+superTrendBuy = trend==1;
+superTrendSell = trend==-1;
+printf( "super trend buy =%f sel =%f\n", superTrendBuy, superTrendSell );
+/*super trend end*/
+/*delivery volume*/
+delVol_ma_shrt = MA( Aux1, 5 );
+delVol_ma_long = MA( Aux1, 21 );
+delVol_check = Aux1 > delVol_ma_shrt AND delVol_ma_shrt > delVol_ma_long;
+/*delivery volume ends*/
+/*open interest check*/
+check_OI = OI > Ref( OI, -1 ) AND Ref( OI, -1 ) > Ref( OI, -2 );
+/*open interest check end*/
+ttlBuy = bbBuy + macdBuy + candlStocBuy + buySlope + buyIchimoku + buyCCI +superTrendBuy;
+ttlSel = bbSell + macdSell + candlStocSell + sellSlope + selIchimoku + sellCCI +superTrendSell;
+
+
+
+AddColumn( ttlBuy, "Buy Strength", 1.2, colorBlack, IIf(ttlBuy>=3,colorGreen,IIf(ttlBuy==2 ,ColorRGB(144,238,144),IIf(ttlBuy==1,ColorRGB(173,255,47),colorLightGrey))), width = 100 );
 AddColumn( ttlSel, "Sel Strength", 1.2, colorBlack, colorLightGrey, width = 100 );
 
-AddColumn( buyIchimoku, "Buy Ichimoku", 1.2, colorBlack, colorLightGrey, width = 100 );
+AddColumn( delVol_check, "Delevery Check", 1.2, colorBlack, IIf(delVol_check,colorGreen,colorLightGrey), width = 100 );
+AddColumn( check_OI, "OI Check", 1.2, colorBlack, IIf(check_OI,colorGreen,colorLightGrey), width = 100 );
+
+AddColumn( buyIchimoku, "Buy Ichimoku", 1.2, colorBlack, IIf(buyIchimoku,colorGreen,colorLightGrey), width = 100 );
 AddColumn( selIchimoku, "Sel Ichimoku", 1.2, colorBlack, colorLightGrey, width = 100 );
 
+AddColumn( candlStocBuy, "Buy Sto Bull candel", 1.2, colorBlack, IIf(candlStocBuy,colorGreen,colorLightGrey), width = 100 );
+AddColumn( candlStocSell, "Sel Sto Bull candel", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( bbBuy, "Buy BB Band", 1.2, colorBlack, IIf(bbBuy,colorGreen,colorLightGrey), width = 100 );
+AddColumn( bbSell, "Sel BB Band", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( macdBuy, "Buy MACD", 1.2, colorBlack, IIf(macdBuy,colorGreen,colorLightGrey), width = 100 );
+AddColumn( macdSell, "Sel MACD", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( buyCCI, "Buy CCI", 1.2, colorBlack, IIf(buyCCI,colorGreen,colorLightGrey), width = 100 );
+AddColumn( sellCCI, "Sel CCI", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( superTrendBuy, "Buy superTrend", 1.2, colorBlack, IIf(superTrendBuy,colorGreen,colorLightGrey), width = 100 );
+AddColumn( superTrendSell, "Sel superTrend", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+AddColumn( buySlope, "Buy slope", 1.2, colorBlack, IIf(buySlope,colorGreen,colorLightGrey), width = 100 );
+AddColumn( sellSlope, "Sel slope", 1.2, colorBlack, colorLightGrey, width = 100 );
+
+_SECTION_BEGIN( "Price1" );
+SetChartOptions( 0, chartShowArrows | chartShowDates );
+_N( Title = StrFormat( "{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ) );
+Plot( C, "Close", ParamColor( "Color", colorDefault ), styleNoTitle | ParamStyle( "Style" ) | GetPriceStyle() );
+_SECTION_END();
+
+
+PositionScore = ttlBuy - ttlSel;
+
+Buy = Ref( candlStocBuy, -1 ) and Ref( bbBuy, -1 )AND Ref( delVol_check, -1 ) AND Ref( C, -1 ) >= L AND Ref( C, -1 ) <= H; //AND Ref( check_OI, -1 ) > Ref( ttlSel, -1 )
+
+Sell = candlStocSell and bbSell;//ttlSel  > ttlBuy
+
+
+Cover = Short = 0;
+
+Buy = ExRem( Buy, Sell );
+Sell = ExRem( Sell, Buy );
+
+openlong = Flip( Buy, Sell );
+
+BuyPrice = ValueWhen( Buy, C ) ;
+SellPrice = ValueWhen( Sell, C ) ;
+
+TG1 = 5;
+TG2 = 10;
+SL = 5;
+TSLP = 50;
+MinSpread =  0.05;
+BTP1 = ( round( BuyPrice * ( 1 + TG1 / 100 ) / MinSpread ) * MinSpread );
+BTP2 = ( round( BuyPrice * ( 1 + TG2 / 100 ) / MinSpread ) * MinSpread );
+BTPrice1 = IIf( openlong OR Sell, BTP1, Null );
+BTPrice2 = IIf( openlong OR Sell, BTP2, Null );
+
+BSLP = ( round( BuyPrice * ( 1 - SL / 100 ) / MinSpread ) * MinSpread );
+BSLPrice = IIf( openlong OR Sell, BSLP, Null );
+
+TSell1 = ( H >= BTPrice1 ) AND !Buy AND !IsNull( BTPrice1 );
+TSell2 = ( H >= BTPrice2 ) AND !Buy AND !IsNull( BTPrice2 );
+SLSell = ( L <= BSLPrice AND !Buy ) AND !IsNull( BSLPrice );
+
+Sell = ( Sell OR TSell2 ) OR SLSell;
+
+Buy = ExRem( Buy, Sell );
+Sell = ExRem( Sell, Buy );
+OpenLong = Flip( Buy, Sell );
+
+
+TSell1 = ( OpenLong ) AND TSell1;
+TSell2 = ( OpenLong OR Sell ) AND TSell2;
+SLSell = ( OpenLong OR Sell ) AND SLSell;
+
+TSell1 = ExRem( TSell1, Sell );
+TSell2 = ExRem( TSell2, Sell );
+SLSell = ExRem( SLSell, Sell );
+
+
+BuyPrice = IIf( OpenLong OR Sell, BuyPrice, Null );
+BTPrice1 = IIf( OpenLong OR Sell, BTPrice1, Null );
+BTPrice2 = IIf( OpenLong OR Sell, BTPrice2, Null );
+BSLPrice = IIf( OpenLong OR Sell, BSLPrice, Null );
+
+
+LongTrailPeriod = Flip( Ref( TSell1, -1 ), Sell ); //start from Tsell1 and finish at sell.
+
+
+function LongTrailPrice( Trigger, TSLP )
+{
+    return HighestSince( Trigger, HighestSince( Trigger, Ref( H, -1 ), 1 ) - TSLP, 1 );
+}
+
+LTSLV = round( ( TSLP * ( BTPrice1 - BuyPrice ) / 100 ) / MinSpread ) * MinSpread;
+
+LongTrailPr = IIf( OpenLong AND LongTrailPeriod, LongTrailPrice( Ref( TSell1, -1 ), LTSLV ), Null );
+LongTrailPr = IIf( LongTrailPr == BTPrice1, LongTrailPr - MinSpread, LongTrailPr );
+
+TrailSell = IIf( IsNull( LongTrailPr ), 0, ( L <= LongTrailPr ) );
+
+Sell = Sell OR TrailSell;
+Buy = ExRem( Buy, Sell );
+Sell = ExRem( Sell, Buy );
+Cover = ExRem( Cover, Short );
+
+OpenLong = Flip( Buy, Sell );
+
+TSell1 = ( OpenLong ) AND TSell1;
+TSell2 = ( OpenLong OR Sell ) AND TSell2;
+SLSell = ( OpenLong OR Sell ) AND SLSell;
+TrailSell = ( OpenLong OR Sell ) AND TrailSell;
+
+TSell1 = ExRem( TSell1, Sell );
+TSell2 = ExRem( TSell2, Sell );
+SLSell = ExRem( SLSell, Sell );
+
+
+TrailSell = ExRem( TrailSell, Sell );
+
+LongTrailPeriod = Flip( TSell1, Sell );
+
+BuyPrice = IIf( OpenLong OR Sell, BuyPrice, Null );
+BTPrice1 = IIf( OpenLong OR Sell, BTPrice1, Null );
+BTPrice2 = IIf( OpenLong OR Sell, BTPrice2, Null );
+BSLPrice = IIf( OpenLong OR Sell, BSLPrice, Null );
+LongTrailPr = IIf( LongTrailPeriod OR TrailSell, LongTrailPr, Null );
+SellPrice = IIf( Sell*SLSell, BSLPrice, IIf( Sell*TSell1, BTPrice1, IIf( Sell*TSell2, BTPrice2, IIf( Sell*TrailSell, LongTrailPr, IIf( Sell, Close, Null ) ) ) ) );
 
 
 
+Plot( BuyPrice, "Buy Price", colorBrightGreen, styleLine | styleThick | styleNoLabel | styleNoRescale | styleNoTitle );
+Plot( BTPrice1, "Buy Target Price1", colorGreen, styleLine | styleDashed | styleNoTitle | styleNoRescale );
+Plot( BTPrice2, "Buy Target Price2", colorGreen, styleLine | styleDashed | styleNoTitle | styleNoRescale );
+Plot( BSLPrice, "Buy SL Price", colorRed, styleLine | styleDashed | styleNoTitle | styleNoRescale );
+Plot( LongTrailPr, "Long Trail Price", colorBrightGreen , styleStaircase | styleThick | styleNoTitle | styleNoRescale | styleNoLabel );
+
+
+PlotShapes( IIf( Buy, shapeSquare, shapeNone ), colorGreen, 0, L, Offset = -40 );
+PlotShapes( IIf( Buy, shapeSquare, shapeNone ), colorLime, 0, L, Offset = -50 );
+PlotShapes( IIf( Buy, shapeUpArrow, shapeNone ), colorWhite, 0, L, Offset = -45 );
+PlotShapes( Sell * shapeDownArrow, colorRed, 0, H, -75, 0 );
+PlotShapes( TSell1 * shapeStar, colorBrightGreen , 0, H, 25, 0 );
+PlotShapes( TSell2 * shapeStar, colorBrightGreen , 0, H, 25, 0 );
+PlotShapes( SLSell * shapeStar, colorRed , 0, L, -25, 0 );
+PlotShapes( TrailSell * shapeStar, colorRed, 0, L, -25, 0 );
+
+
+
+AlertIf( Buy, "", "BUY @ " + BuyPrice, 1 );
+AlertIf( Sell, "", "SELL @ " + SellPrice, 2 );
+
+
+
+
+
+
+GfxSelectFont( "Arial", 9, 100 );
+GfxSetBkMode( 1 );
+GfxSetTextColor( colorWhite );
+
+if( SelectedValue( openLong ) == 1 )
+{
+    GfxSelectSolidBrush( colorDarkGreen );
+}
+else
+{
+    GfxSelectSolidBrush( colorDarkGrey );
+}
+
+pxHeight = Status( "pxchartheight" ) ;
+pxWidth = Status( "pxchartwidth" );
+
+boxWid = 250;
+boxHet = 200;
+
+x1 = 5;
+y1 = pxHeight - boxHet;
+
+x2 = x1 + boxWid;
+y2 = pxHeight;
+
+sp = 18;
+DP = 1.2;
+
+Relax = !openLong AND !Sell;
+
+GfxSelectPen( colorBlue, 1 );
+GfxRoundRect( x1, y1, x2, y2 , 10, 10 );
+
+GfxSelectFont( "Arial", 11, 1000 );
+GfxTextOut( WriteIf( openLong, "Buy @ " + WriteVal( BuyPrice, DP ), "" ) , 10, y2 - boxHet + sp );
+GfxTextOut( WriteIf( Sell, "Sold @ " + WriteVal( SellPrice, DP ), "" ) , 10, y2 - boxHet + 2 * sp );
+GfxTextOut( WriteIf( Sell, "Profit @ " + WriteVal( ( SellPrice - BuyPrice ), DP ), "" ) , 10, y2 - boxHet + 4 * sp );
+GfxTextOut( WriteIf( Relax, "No Trade Zone - Relax!", "" ), 10, y2 - boxHet + sp );
+GfxTextOut( WriteIf( openLong AND !LongTrailPeriod, "Target:" + NumToStr( IIf( openLong AND !LongTrailPeriod, BTPrice1, Null ), DP ), "" ), 10, y2 - boxHet + 3 * sp );
+GfxTextOut( WriteIf( openLong , "StopLoss: " + WriteVal( IIf( openLong, BSLPrice , Null ), 1.2 ), "" ), 10, y2 - boxHet + 5 * sp );
+GfxTextOut( WriteIf( LongTrailPeriod , "Target:" + NumToStr( IIf( LongTrailPeriod, BTPrice2, Null ), DP ), "" ), 10, y2 - boxHet + 3 * sp );
+
+
+
+
+_SECTION_BEGIN( "BackTest Settings" );
+RoundLotSize = 1;
+maxPos = 10;
+TickSize = 0.05;
+CAMN = 0.119071; // 0.1% commision per trade + slippage.
+INEQ = 500000;//Optimize( "Max INEQ", Max_INEQ, 10000, 30000, 10000 );
+_SECTION_END();
+
+if( Status( "action" ) == actionBacktest )
+{
+    SetOption( "InitialEquity", INEQ );
+    SetOption( "MaxOpenPositions", maxPos );
+    SetOption( "AccountMargin", 100 );
+    SetOption( "MinShares", 1 );
+    SetOption( "PriceBoundChecking", True );
+    SetOption( "CommissionMode", 1 ); //1 % FOR PER TRADE
+    SetOption( "CommissionAmount", CAMN );
+    SetPositionSize( INEQ / maxPos, spsValue ); // number of per trade position value ///INEQ / maxPos, spsValue --( 100, spsPercentOfEquity )
+    SetOption( "AllowSameBarExit", False );
+    SetOption( "InterestRate", 6 );
+    SetBacktestMode( backtestRegular );
+}

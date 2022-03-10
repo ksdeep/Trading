@@ -1,11 +1,15 @@
 import logging
+
+import numpy as np
 import pandas as pd
 import yfinance as yf
+from tvDatafeed import TvDatafeed, Interval
 from pynse import *
 import nsepy as npy
 from dateutil.relativedelta import relativedelta, TH
 import datetime as dt
 import os
+import re
 import talib as ta
 import matplotlib.pyplot as plot
 import mplfinance as mpf
@@ -55,13 +59,15 @@ def downlaodBhavCopy(mypath):
 
 def getLast10YrsAdjustedEODData(mypath):
     symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
-    existingData = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
-    existingData['Date'] = pd.to_datetime(existingData['Date'])
-    existingData = existingData.set_index('Date')
-    existingData = existingData.drop(
-        columns=['correctedOpen', 'correctedClose', 'correctedHigh', 'correctedLow', 'Symbol_Date'])
+    try:
+        existingData = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv')
+        existingData['Date'] = pd.to_datetime(existingData['Date'])
+        existingData = existingData.set_index('Date')
+        existingData = existingData.drop(
+            columns=['correctedOpen', 'correctedClose', 'correctedHigh', 'correctedLow', 'Symbol_Date'])
+    except:
+        existingData = pd.DataFrame()
 
-    symbols = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'FNO.csv')
     correctedEODData = pd.concat([yf.download(sym + '.NS',
                                               start=dt.date.today().replace(year=dt.date.today().year - 10),
                                               end=dt.date.today(),
@@ -83,18 +89,70 @@ def getLast10YrsAdjustedEODData(mypath):
     correctedEODData['Symbol_Date'] = correctedEODData.apply(
         lambda x: x['Symbol'] + '_' + dt.datetime.strftime(x['Date'], '%Y-%m-%d'), axis=1)
 
-    logging.info('corrected data downloaded from Yahaoo ' + str(correctedEODData.shape))
+    logging.info('corrected data downloaded from Yahaoo' + str(correctedEODData.shape))
 
-    start_date = existingData.index.max().date() + relativedelta(days=1)
-    end_date = dt.date.today()
-    rawData = pd.DataFrame()
-    for sym in symbols.SYMBOL:
-        logging.info('NSE hist data for %s ' % sym)
-        rawData = rawData.append(npy.get_history(symbol=sym,
-                                                 start=start_date,
-                                                 end=end_date))
+    if existingData.shape[0] > 0:
+        start_date = existingData.index.max().date() + relativedelta(days=1)
+    else:
+        start_date = dt.date.today().replace(year=dt.date.today().year - 10)
+        end_date = dt.date.today()
+
+    try:
+        if start_date < end_date:
+            dateRange = pd.Series(pd.date_range(start_date, end_date, freq='B').values)
+            holiday_list = pd.read_excel(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'nse_holidays.xlsx')
+            dateRange = dateRange.loc[~dateRange.isin(holiday_list.holidays)]
+
+            rawData = pd.DataFrame()
+            if dateRange.shape[0] > 0:
+                for sym in symbols.SYMBOL:
+
+                    logging.info(
+                        'NSE hist data for %s %s %s' % (sym, dt.datetime.strftime(dateRange.iloc[0], '%Y-%m-%d'),
+                                                        dt.datetime.strftime(dateRange.iloc[-1], '%Y-%m-%d')))
+                    df = npy.get_history(symbol=re.sub('&', '%26', sym), start=dateRange.iloc[0], end=dateRange.iloc[-1])
+                    logging.info(
+                        'NSE hist data for %s %s %s Size %s' % (
+                            sym, dt.datetime.strftime(dateRange.iloc[0], '%Y-%m-%d'),
+                            dt.datetime.strftime(dateRange.iloc[-1], '%Y-%m-%d'),
+                            str(df.shape[0])))
+                    if df.index.max() != dateRange.iloc[-1]:
+                        logging.info('NSE hist data for %s missing max date %s RERUNNING' % (
+                            sym, dt.datetime.strftime(dateRange.iloc[-1], '%Y-%m-%d')))
+                        df1 = npy.get_history(symbol=re.sub('&', '%26', sym),
+                                              start=dateRange.iloc[-1],
+                                              end=dateRange.iloc[-1])
+                        logging.info('NSE hist data for %s missing max date %s DATA SIZE %s' % (
+                            sym, dt.datetime.strftime(dateRange.iloc[-1], '%Y-%m-%d'),
+                            str(df1.shape[0])))
+                        if len(df1) > 0:
+                            df = df.append(df1)
+                    allDates = dateRange.apply(lambda x: dt.datetime.strftime(x, '%Y%m%d'))
+                    fndDates = pd.Series(df.index).apply(lambda x: dt.datetime.strftime(x, '%Y%m%d'))
+
+                    st = pd.Series(list(set(allDates) - set(fndDates))).apply(
+                        lambda x: dt.datetime.strptime(x, '%Y%m%d'))
+                    missingDates = correctedEODData.loc[((correctedEODData.Symbol == sym) &
+                                                         (correctedEODData.Date.isin(st))), 'Date']
+                    if len(missingDates) > 0:
+                        for dd in missingDates:
+                            logging.info('NSE hist data for %s missing date %s so runnig again' % (
+                                sym, dd))
+                            df1 = npy.get_history(symbol=re.sub('&', '%26', sym),
+                                                  start=dd,
+                                                  end=dd)
+                            logging.info('NSE hist data for %s missing date %s DATA SIZE %s' % (
+                                sym, dd,str(df1.shape[0])))
+                            if len(df1) > 0:
+                                df = df.append(df1)
+
+                    rawData = rawData.append(df)
+    except:
+        logging.error('Error to pull NSE data')
+        rawData = pd.DataFrame()
+
     if rawData.shape[0] > 0:
-        #rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
+        # rawData['VolumePerTrade'] = rawData['Volume'] / rawData['Trades']
 
         mergedData = pd.concat([existingData, rawData])
         mergedData = mergedData.reset_index()
@@ -220,11 +278,11 @@ def getFeaturesOIDataForLast6Months(mypath):
                                                                     0]
                                                                 ]}))
 
-    if oiData.shape[0]>0:
+    if oiData.shape[0] > 0:
         newOi = existingOIData.append(oiData)
-        newOi.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',index=False)
-        return  newOi
-    else :
+        newOi.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv', index=False)
+        return newOi
+    else:
         return existingOIData
 
 
@@ -242,9 +300,9 @@ def getFIIInvestmentData(mypath):
 
     for _, dd in dateDf.iterrows():
         urlShrt = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
-        dd['shrtDt'])
+            dd['shrtDt'])
         urlLng = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
-        dd['longDt'])
+            dd['longDt'])
         if data.shape[0] == 0:
             try:
                 data = pd.read_html(urlShrt)[0].iloc[3:, [1, 32]]
@@ -266,13 +324,28 @@ def getFIIInvestmentData(mypath):
                             left_on='Sector',
                             right_on='Sector',
                             how='outer')
-    if data.shape[0]>0:
-        data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv',index=False)
+    if data.shape[0] > 0:
+        data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv', index=False)
         return data
     else:
         existingfii
 
 
+def getForexCommodityData(mypath):
+    tv = TvDatafeed()
+    symbols = ['USDINR', 'USDBRO', 'GOLD1!', 'SILVER1!', 'COPPER1!', 'ALUMINIUM1!', 'IN1!']
+    exch = ['IDC', 'IDC', 'MCX', 'MCX', 'MCX', 'MCX', 'SGX']
+    symExch = pd.DataFrame({'symbols': symbols, 'exch': exch})
+    try:
+        existingfii = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'forexCommodity.csv')
+    except:
+        existingfii = pd.DataFrame()
+
+    for _, row in symExch.iterrows():
+        df = tv.get_hist(symbol=row['symbols'], exchange=row['exch'], interval=Interval.in_daily, n_bars=5000)
+        existingfii = existingfii.append(df)
+
+    return
 
 
 def generateData():
@@ -280,30 +353,61 @@ def generateData():
     oiData = getFeaturesOIDataForLast6Months(DATA_FLRD)
     fiiData = getFIIInvestmentData(DATA_FLRD)
 
+    dataForAmiBrokder = pd.merge(left=eodData.reset_index(),
+                                 right=oiData,
+                                 left_on=['Symbol', 'Date'],
+                                 right_on=['Symbol', 'Date'],
+                                 how='left')
+    dataForAmiBrokder['YMD'] = dataForAmiBrokder.Date.apply(lambda x: dt.datetime.strftime(x.date(), '%Y%m%d'))
+
+    start = dt.date.today().replace(year=dt.date.today().year - 10)
+    end = dt.date.today()
+    dateRange = pd.Series(pd.date_range(start, end, freq='B').values)
+    holiday_list = pd.read_excel(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'nse_holidays.xlsx')
+    dateRange = dateRange.loc[~dateRange.isin(holiday_list.holidays)]
+
+    dataForAmiBrokderGrpd = dataForAmiBrokder.groupby('Symbol')
+
+    for name, grpd in dataForAmiBrokderGrpd:
+        max_date = grpd.Date.max()
+        min_date = grpd.Date.min()
+        if max_date != dateRange[dateRange.shape[0] - 1]:
+            logging.error('Max date not equal to current date')
+
+    dataForAmiBrokder[['Symbol', 'YMD', 'Open',
+                       'High', 'Low', 'Close',
+                       'Volume', 'Trades', 'Deliverable Volume',
+                       'cummOI']].to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'dataForAmiBrokder.csv',
+                                         index=False)
+    dataForAmiBrokder['Symbol_VWAP'] = dataForAmiBrokder.Symbol.apply(lambda x: x + '_VWAP')
+    dataForAmiBrokder[['Symbol_VWAP', 'YMD', 'correctedOpen',
+                       'correctedHigh', 'correctedLow', 'correctedClose',
+                       'VWAP']].to_csv(DATA_FLRD + os.path.sep + 'NSEData' + os.path.sep + 'dataForAmiBrokderVWAP.csv',
+                                       index=False)
+
 
 def whereAreFiiInvesting(myPath):
     def masscenter(arr):
-        return (arr[1] - arr[0])*100/arr[0]
+        return (arr[1] - arr[0]) * 100 / arr[0]
 
     fiiData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
     fiiData.set_index('Sector', inplace=True)
 
-    changFii = fiiData.rolling(window=2,axis=1).apply(masscenter,raw=True)
+    changFii = fiiData.rolling(window=2, axis=1).apply(masscenter, raw=True)
 
-    changFiiDesc = changFii.iloc[0:changFii.shape[0] - 1, :].sort_values(changFii.columns[len(changFii.columns) - 1], ascending=False)
+    changFiiDesc = changFii.iloc[0:changFii.shape[0] - 1, :].sort_values(changFii.columns[len(changFii.columns) - 1],
+                                                                         ascending=False)
     fiiData.iloc[0:changFii.shape[0] - 1, :].to_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fiiPlot.csv')
     changFiiDesc.to_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'fiiChangePlot.csv')
 
+
 def analzeStcocsBasedOIDelevery(myPath):
-    eodData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv',low_memory=False)
-    oiData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv',low_memory=False)
+    eodData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'NSEBhavCopy.csv', low_memory=False)
+    oiData = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'oiData.csv', low_memory=False)
     stockDesc = pd.read_csv(myPath + os.path.sep + 'NSEData' + os.path.sep + 'index.csv', low_memory=False)
 
     for script in eodData.Symbol.unique():
         eodDScript = eodData.script
-
-
-
 
 
 
