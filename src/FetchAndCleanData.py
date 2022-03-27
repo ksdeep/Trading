@@ -291,44 +291,8 @@ def getFIIInvestmentData(mypath):
         existingfii = pd.read_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv')
     except:
         existingfii = pd.DataFrame()
-    endDate = dt.date.today()
-    startDate = endDate - relativedelta(months=6)
-    dtSrs = pd.Series(pd.date_range(startDate, endDate, freq='SM')).apply(lambda x: x.strftime('%b%d%Y'))
-    dtSrsLong = pd.Series(pd.date_range(startDate, endDate, freq='SM')).apply(lambda x: x.strftime('%B%d%Y'))
-    dateDf = pd.DataFrame({'shrtDt': dtSrs, 'longDt': dtSrsLong})
-    data = pd.DataFrame()
-
-    for _, dd in dateDf.iterrows():
-        urlShrt = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
-            dd['shrtDt'])
-        urlLng = f'https://www.fpi.nsdl.co.in/web/StaticReports/Fortnightly_Sector_wise_FII_Investment_Data/FIIInvestSector_%s.html' % (
-            dd['longDt'])
-        if data.shape[0] == 0:
-            try:
-                data = pd.read_html(urlShrt)[0].iloc[3:, [1, 32]]
-                data.columns = ['Sector', dd['shrtDt']]
-
-            except:
-                data = pd.read_html(urlLng)[0].iloc[3:, [1, 32]]
-                data.columns = ['Sector', dd['longDt']]
-
-        else:
-            try:
-                temp = pd.read_html(urlShrt)[0].iloc[3:, [1, 32]]
-                temp.columns = ['Sector', dd['shrtDt']]
-            except:
-                temp = pd.read_html(urlLng)[0].iloc[3:, [1, 32]]
-                temp.columns = ['Sector', dd['longDt']]
-            data = pd.merge(left=data,
-                            right=temp,
-                            left_on='Sector',
-                            right_on='Sector',
-                            how='outer')
-    if data.shape[0] > 0:
-        data.to_csv(mypath + os.path.sep + 'NSEData' + os.path.sep + 'fii.csv', index=False)
-        return data
-    else:
-        existingfii
+    
+    
 
 
 def getForexCommodityData(mypath):
