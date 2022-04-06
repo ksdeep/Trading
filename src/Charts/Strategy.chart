@@ -9,71 +9,71 @@
 			<FilePath>Formulas\\Drag-drop\\Price (all in one) 5.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>1186.4</Min>
-			<Max>1486.34</Max>
+			<Min>961.5</Min>
+			<Max>1684.56</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1365</ChartID>
-			<PercentHeight>16.6667</PercentHeight>
+			<PercentHeight>17</PercentHeight>
 			<Formula>_SECTION_BEGIN("ATR");\r\nperiods = Param( "Periods", 15, 1, 200, 1 );\r\nPlot( ATR(periods), _DEFAULT_NAME(), ParamColor( "Color", colorCycle ), ParamStyle("Style") );\r\nPlot( MA(ATR(periods),5), "5 MA", colorRed, ParamStyle("Style") );\r\nPlot( MA(ATR(periods),21), "21 MA", colorBlue, ParamStyle("Style") );\r\n\r\n_SECTION_END();\r\n\r\n</Formula>
 			<FilePath>Formulas\\Custom\\ATR - Average True Range 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>32.0452</Min>
-			<Max>46.1263</Max>
+			<Min>38.9868</Min>
+			<Max>77.18</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1366</ChartID>
-			<PercentHeight>16.6667</PercentHeight>
+			<PercentHeight>17</PercentHeight>
 			<Formula>_SECTION_BEGIN("RSI");\r\nSetChartOptions(0,0,chartGrid30|chartGrid70);\r\nperiods = Param( "Periods", 15, 1, 200, 1 );\r\nPlot( RSI( periods), _DEFAULT_NAME(), ParamColor( "Color", colorCycle ), ParamStyle("Style")  );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\RSI - Relative Strength Index 3.afl</FilePath>
 			<Flags>3072</Flags>
 			<MoreFlags>1073741825</MoreFlags>
-			<Min>26.9612</Min>
-			<Max>61.4088</Max>
+			<Min>20.6307</Min>
+			<Max>84.4876</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1367</ChartID>
-			<PercentHeight>16.6667</PercentHeight>
+			<PercentHeight>17</PercentHeight>
 			<Formula>_SECTION_BEGIN("RS");\r\nbase = ParamStr("RS base ticker", GetBaseIndex() );\r\nPlot( RelStrength(base), _SECTION_NAME() + "(" + base + ")", ParamColor( "color", colorCycle ), ParamStyle("Style")  );\r\nPlot( MA(RelStrength(base),5), "5 MA", colorRed, ParamStyle("Style") );\r\nPlot( MA(RelStrength(base),21), "21 MA", colorBlue, ParamStyle("Style") );\r\n\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Custom\\RS - Comparative Relative Strength 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>9345.58</Min>
-			<Max>16731.2</Max>
+			<Min>56.4735</Min>
+			<Max>96.0138</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
 		<Name>Step 2</Name>
 		<Pane>
 			<ChartID>1388</ChartID>
-			<PercentHeight>65.5405</PercentHeight>
+			<PercentHeight>66</PercentHeight>
 			<Formula>_SECTION_BEGIN("Ichimoku");\r\nprds = Param( "Standard Line Periods", 13, 5, 26, 1 );\r\nturn = Param( "Turning Line Periods", 3, 3, 10, 1 );\r\ndelay = Param( "Delayed Line Periods", 12, 4, 26, 1 );\r\nspan = Param( "Spans Periods", 16, 10, 52, 1 );\r\n\r\nTL = ( HHV( H, turn ) + LLV( L, turn ) ) / 2;\r\nSL = ( HHV( H, prds ) + LLV( L, prds ) ) / 2;\r\nDL = Ref( C, delay );\r\nSp1 = ( SL + TL ) / 2;\r\nSp2 = ( HHV( H, span ) + LLV( L, span ) ) / 2;\r\n\r\n_N( Title = StrFormat( "{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) Vol " + WriteVal( V, 1.0 ) + " {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ) );\r\n\r\nPlot( C, "Close", colorDefault, styleNoTitle | GetPriceStyle() );\r\nPlot( SL, "SL", colorRed, styleThick | styleNoLabel );\r\nPlot( TL, "TL", colorGreen, styleThick | styleNoLabel );\r\ncolor = IIf( Sp1 &gt; Sp2, ParamColor( "Span1 Color", ColorRGB( 0, 255, 0 ) ), ParamColor( "Span2 Color", ColorRGB( 255, 104, 32 ) ) );\r\nPlotOHLC ( Sp1, Sp1, Sp2, Sp2, "Cloud", Color, styleCloud | styleNoLabel, Null, Null, delay, -2 );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\Ichimoku 2.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>1185.03</Min>
-			<Max>1558.58</Max>
+			<Min>336.122</Min>
+			<Max>658.232</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1369</ChartID>
-			<PercentHeight>17.5676</PercentHeight>
+			<PercentHeight>18</PercentHeight>
 			<Formula>_SECTION_BEGIN("MACD");\r\nr1 = Param( "Fast avg", 12, 2, 200, 1 );\r\nr2 = Param( "Slow avg", 26, 2, 200, 1 );\r\nr3 = Param( "Signal avg", 9, 2, 200, 1 );\r\nPlot( ml = MACD(r1, r2), StrFormat(_SECTION_NAME()+"(%g,%g)", r1, r2), ParamColor("MACD color", colorRed ), ParamStyle("MACD style") );\r\nPlot( sl = Signal(r1,r2,r3), "Signal" + _PARAM_VALUES(), ParamColor("Signal color", colorBlue ), ParamStyle("Signal style") );\r\nPlot( ml-sl, "MACD Histogram", ParamColor("Histogram color", colorDefault ), styleNoTitle | ParamStyle("Histogram style", styleHistogram | styleNoLabel, maskHistogram ) );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\MACD - Moving Average Convergence Divergence 4.afl</FilePath>
 			<Flags>768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-23.7817</Min>
-			<Max>10.4724</Max>
+			<Min>-3.76487</Min>
+			<Max>23.3505</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1538</ChartID>
-			<PercentHeight>16.8919</PercentHeight>
+			<PercentHeight>17</PercentHeight>
 			<Formula>_SECTION_BEGIN("AccDist");\r\nPlot( AccDist(), _DEFAULT_NAME(), ParamColor("Color", colorCycle ), ParamStyle("Style") );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\AccDist - Accumulation Distribution 1.afl</FilePath>
 			<Flags>256</Flags>
-			<MoreFlags>805306369</MoreFlags>
-			<Min>7.05774e+006</Min>
-			<Max>1.05797e+007</Max>
+			<MoreFlags>1342177281</MoreFlags>
+			<Min>-2.27069e+006</Min>
+			<Max>2.2643e+006</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
@@ -85,8 +85,8 @@
 			<FilePath>Formulas\\Drag-drop\\Price 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>1186.4</Min>
-			<Max>1486.34</Max>
+			<Min>336.122</Min>
+			<Max>658.232</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1447</ChartID>
@@ -95,8 +95,8 @@
 			<FilePath>Formulas\\Drag-drop\\CCI - Commodity Channel Index 1.afl</FilePath>
 			<Flags>32768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-267.182</Min>
-			<Max>135.519</Max>
+			<Min>-223.422</Min>
+			<Max>528.043</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1448</ChartID>
@@ -105,8 +105,8 @@
 			<FilePath>Formulas\\Drag-drop\\CCI - Commodity Channel Index 2.afl</FilePath>
 			<Flags>32768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-207.01</Min>
-			<Max>-43.1599</Max>
+			<Min>-90.0308</Min>
+			<Max>395.441</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
@@ -118,8 +118,8 @@
 			<FilePath>C:\\Users\\ksdee\\Documents\\PersonalFinance\\Trading\\Trading\\src\\Strategy1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>1183.02</Min>
-			<Max>1663.79</Max>
+			<Min>262.252</Min>
+			<Max>1719.66</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1454</ChartID>
@@ -128,8 +128,8 @@
 			<FilePath>Formulas\\Custom\\del_oi_2.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-128165</Min>
-			<Max>1.30679e+007</Max>
+			<Min>-132873</Min>
+			<Max>6.98381e+006</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1450</ChartID>
@@ -138,8 +138,8 @@
 			<FilePath>Formulas\\Custom\\del_vol_oi.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>2.7365e+006</Min>
-			<Max>4.03809e+006</Max>
+			<Min>-0.002</Min>
+			<Max>0.10512</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
@@ -151,15 +151,21 @@
 			<FilePath>C:\\Users\\ksdee\\Documents\\PersonalFinance\\Trading\\Trading\\src\\Strategy1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>391.839</Min>
-			<Max>634.603</Max>
+			<Min>765.803</Min>
+			<Max>1694.38</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
 		<Name>Sheet 6</Name>
 		<Pane>
-			<ChartID>0</ChartID>
-			<PercentHeight>50</PercentHeight>
+			<ChartID>1542</ChartID>
+			<PercentHeight>100</PercentHeight>
+			<Formula>_SECTION_BEGIN("Price");\r\nSetChartOptions(0,chartShowArrows|chartShowDates);\r\n_N(Title = StrFormat("{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ));\r\nPlot( C, "Close", ParamColor("Color", colorDefault ), styleNoTitle | ParamStyle("Style") | GetPriceStyle() ); \r\n_SECTION_END();\r\n</Formula>
+			<FilePath>Formulas\\Drag-drop\\Price 3.afl</FilePath>
+			<Flags>256</Flags>
+			<MoreFlags>1073741835</MoreFlags>
+			<Min>961.5</Min>
+			<Max>1684.56</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
