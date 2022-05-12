@@ -9,8 +9,8 @@
 			<FilePath>Formulas\\Drag-drop\\Price (all in one) 5.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>961.5</Min>
-			<Max>1684.56</Max>
+			<Min>161.451</Min>
+			<Max>263.185</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1365</ChartID>
@@ -19,8 +19,8 @@
 			<FilePath>Formulas\\Custom\\ATR - Average True Range 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>38.9868</Min>
-			<Max>77.18</Max>
+			<Min>5.97395</Min>
+			<Max>14.5154</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1366</ChartID>
@@ -29,8 +29,8 @@
 			<FilePath>Formulas\\Drag-drop\\RSI - Relative Strength Index 3.afl</FilePath>
 			<Flags>3072</Flags>
 			<MoreFlags>1073741825</MoreFlags>
-			<Min>20.6307</Min>
-			<Max>84.4876</Max>
+			<Min>26.592</Min>
+			<Max>74.7359</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1367</ChartID>
@@ -39,41 +39,41 @@
 			<FilePath>Formulas\\Custom\\RS - Comparative Relative Strength 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>56.4735</Min>
-			<Max>96.0138</Max>
+			<Min>9.718</Min>
+			<Max>14.4952</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
 		<Name>Step 2</Name>
 		<Pane>
 			<ChartID>1388</ChartID>
-			<PercentHeight>66</PercentHeight>
+			<PercentHeight>33</PercentHeight>
 			<Formula>_SECTION_BEGIN("Ichimoku");\r\nprds = Param( "Standard Line Periods", 13, 5, 26, 1 );\r\nturn = Param( "Turning Line Periods", 3, 3, 10, 1 );\r\ndelay = Param( "Delayed Line Periods", 12, 4, 26, 1 );\r\nspan = Param( "Spans Periods", 16, 10, 52, 1 );\r\n\r\nTL = ( HHV( H, turn ) + LLV( L, turn ) ) / 2;\r\nSL = ( HHV( H, prds ) + LLV( L, prds ) ) / 2;\r\nDL = Ref( C, delay );\r\nSp1 = ( SL + TL ) / 2;\r\nSp2 = ( HHV( H, span ) + LLV( L, span ) ) / 2;\r\n\r\n_N( Title = StrFormat( "{{NAME}} - {{INTERVAL}} {{DATE}} Open %g, Hi %g, Lo %g, Close %g (%.1f%%) Vol " + WriteVal( V, 1.0 ) + " {{VALUES}}", O, H, L, C, SelectedValue( ROC( C, 1 ) ) ) );\r\n\r\nPlot( C, "Close", colorDefault, styleNoTitle | GetPriceStyle() );\r\nPlot( SL, "SL", colorRed, styleThick | styleNoLabel );\r\nPlot( TL, "TL", colorGreen, styleThick | styleNoLabel );\r\ncolor = IIf( Sp1 &gt; Sp2, ParamColor( "Span1 Color", ColorRGB( 0, 255, 0 ) ), ParamColor( "Span2 Color", ColorRGB( 255, 104, 32 ) ) );\r\nPlotOHLC ( Sp1, Sp1, Sp2, Sp2, "Cloud", Color, styleCloud | styleNoLabel, Null, Null, delay, -2 );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\Ichimoku 2.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>336.122</Min>
-			<Max>658.232</Max>
+			<Min>161.451</Min>
+			<Max>263.185</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1369</ChartID>
-			<PercentHeight>18</PercentHeight>
+			<PercentHeight>33</PercentHeight>
 			<Formula>_SECTION_BEGIN("MACD");\r\nr1 = Param( "Fast avg", 12, 2, 200, 1 );\r\nr2 = Param( "Slow avg", 26, 2, 200, 1 );\r\nr3 = Param( "Signal avg", 9, 2, 200, 1 );\r\nPlot( ml = MACD(r1, r2), StrFormat(_SECTION_NAME()+"(%g,%g)", r1, r2), ParamColor("MACD color", colorRed ), ParamStyle("MACD style") );\r\nPlot( sl = Signal(r1,r2,r3), "Signal" + _PARAM_VALUES(), ParamColor("Signal color", colorBlue ), ParamStyle("Signal style") );\r\nPlot( ml-sl, "MACD Histogram", ParamColor("Histogram color", colorDefault ), styleNoTitle | ParamStyle("Histogram style", styleHistogram | styleNoLabel, maskHistogram ) );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\MACD - Moving Average Convergence Divergence 4.afl</FilePath>
 			<Flags>768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-3.76487</Min>
-			<Max>23.3505</Max>
+			<Min>-9.53414</Min>
+			<Max>6.70742</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1538</ChartID>
-			<PercentHeight>17</PercentHeight>
+			<PercentHeight>33</PercentHeight>
 			<Formula>_SECTION_BEGIN("AccDist");\r\nPlot( AccDist(), _DEFAULT_NAME(), ParamColor("Color", colorCycle ), ParamStyle("Style") );\r\n_SECTION_END();\r\n</Formula>
 			<FilePath>Formulas\\Drag-drop\\AccDist - Accumulation Distribution 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-2.27069e+006</Min>
-			<Max>2.2643e+006</Max>
+			<Min>-8.51355e+007</Min>
+			<Max>-5.17392e+007</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
@@ -85,8 +85,8 @@
 			<FilePath>Formulas\\Drag-drop\\Price 1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>336.122</Min>
-			<Max>658.232</Max>
+			<Min>161.451</Min>
+			<Max>263.185</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1447</ChartID>
@@ -95,8 +95,8 @@
 			<FilePath>Formulas\\Drag-drop\\CCI - Commodity Channel Index 1.afl</FilePath>
 			<Flags>32768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-223.422</Min>
-			<Max>528.043</Max>
+			<Min>-297.147</Min>
+			<Max>213.808</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1448</ChartID>
@@ -105,8 +105,8 @@
 			<FilePath>Formulas\\Drag-drop\\CCI - Commodity Channel Index 2.afl</FilePath>
 			<Flags>32768</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-90.0308</Min>
-			<Max>395.441</Max>
+			<Min>-264.885</Min>
+			<Max>163.835</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
@@ -118,8 +118,8 @@
 			<FilePath>C:\\Users\\ksdee\\Documents\\PersonalFinance\\Trading\\Trading\\src\\Strategy1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>262.252</Min>
-			<Max>1719.66</Max>
+			<Min>160.922</Min>
+			<Max>290.983</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1454</ChartID>
@@ -128,8 +128,8 @@
 			<FilePath>Formulas\\Custom\\del_oi_2.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-132873</Min>
-			<Max>6.98381e+006</Max>
+			<Min>-125440</Min>
+			<Max>1.84112e+007</Max>
 		</Pane>
 		<Pane>
 			<ChartID>1450</ChartID>
@@ -138,12 +138,12 @@
 			<FilePath>Formulas\\Custom\\del_vol_oi.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1342177281</MoreFlags>
-			<Min>-0.002</Min>
-			<Max>0.10512</Max>
+			<Min>-158300</Min>
+			<Max>8.32025e+006</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
-		<Name>Sheet 5</Name>
+		<Name>SuperTrend</Name>
 		<Pane>
 			<ChartID>1527</ChartID>
 			<PercentHeight>100</PercentHeight>
@@ -151,12 +151,12 @@
 			<FilePath>C:\\Users\\ksdee\\Documents\\PersonalFinance\\Trading\\Trading\\src\\Strategy1.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>765.803</Min>
-			<Max>1694.38</Max>
+			<Min>160.922</Min>
+			<Max>290.983</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
-		<Name>Sheet 6</Name>
+		<Name>Study</Name>
 		<Pane>
 			<ChartID>1542</ChartID>
 			<PercentHeight>100</PercentHeight>
@@ -164,15 +164,21 @@
 			<FilePath>Formulas\\Drag-drop\\Price 3.afl</FilePath>
 			<Flags>256</Flags>
 			<MoreFlags>1073741835</MoreFlags>
-			<Min>961.5</Min>
-			<Max>1684.56</Max>
+			<Min>703.805</Min>
+			<Max>1284.54</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>
 		<Name>Sheet 7</Name>
 		<Pane>
-			<ChartID>0</ChartID>
-			<PercentHeight>50</PercentHeight>
+			<ChartID>1562</ChartID>
+			<PercentHeight>100</PercentHeight>
+			<Formula>// Downloaded From https://www.WiseStockTrader.com\r\n// P&amp;F chart based on closing price\r\n// Date &amp; Bar Number of start &amp; end of columns\r\n// Graham Kavanagh  17 Apr 2004\r\n// Interpretation window data included\r\n// 1:1 Line drawn when column selected with slope=boxsize\r\n// Box size based on ATR of closing price \r\n\r\nVersion(4.53);\r\n\r\nSetBarsRequired(100000,100000);\r\n\r\nrange = Min(260,BarCount/2);\r\nbox = LastValue(round(C*0.01));\r\nrev = 3  ;      // reversal requirement\r\n\r\nCX = round(C/box);\r\nCF = ceil(Cx);\r\nCR = floor(Cx);\r\n\r\nBar = BarIndex();\r\nBarDate = DateNum();\r\nBarTurn = 0;\r\nBarEnd = 0;\r\n\r\n\r\n// initialize first element\r\nj = 0;\r\nPFC[j] = CF[0];\r\nPFO[j] = CF[0]+1;\r\n\r\ndown = 1;                  // By default the first bar is a down bar.\r\nup = 0;\r\n\r\n// perform the loop that produces PF Chart\r\nfor( i = 1; i &lt; BarCount; i++ )\r\n{\r\n if( CF[i] &lt;= PFC[j]-1 &amp;&amp; down)         //continue down\r\n {\r\n  PFC[j] = CF[i];\r\n  PFO[j] = CF[i]+1;\r\n  BarEnd[j] = Bar[i];\r\n }\r\n else\r\n {\r\n  if( CR[i] &gt;= PFC[j] + rev &amp;&amp; down)  //Change direction to up\r\n  {\r\n   j++;\r\n   up = 1;\r\n   down = 0;\r\n   PFC[j] = CR[i];\r\n   PFO[j] = CR[i] - 1;\r\n   BarTurn[j] = Bar[i];\r\n   BarEnd[j] = Bar[i];\r\n  }\r\n }\r\n if( CR[i] &gt;= PFC[j] + 1 &amp;&amp; up)         //Continue up\r\n {\r\n  PFC[j] = CR[i];\r\n  PFO[j] = CR[i] - 1;\r\n  BarEnd[j] = Bar[i];\r\n }\r\n else\r\n {\r\n  if( CF[i] &lt;= PFC[j] - rev &amp;&amp; up)   //Change direction to down\r\n  {\r\n   j++;\r\n   up = 0;\r\n   down = 1;\r\n   PFC[j] = CR[i];\r\n   PFO[j] = CR[i]+1;\r\n   BarTurn[j] = Bar[i];\r\n   BarEnd[j] = Bar[i];\r\n  }\r\n }\r\n}\r\n\r\ndelta = BarCount-1 - j;\r\n\r\nBarTurns = Ref( BarTurn, -delta);\r\nBarEnds = Ref( BarEnd, -delta);\r\n\r\nPFO = Ref( PFO, -delta );\r\nPFC = Ref( PFC, -delta );\r\nH = IIf( Ref(PFC,-1)&gt;Ref(PFO,-1), Ref(HHV(PFC,1),-1)-1, Max(PFO,PFC) )*box +\r\nbox/2;\r\nL = IIf( Ref(PFC,-1)&lt;Ref(PFO,-1), Ref(LLV(PFC,1),-1)+1, Min(PFO,PFC) )*box -\r\nbox/2;\r\nO = IIf( Ref(PFC,-1)&gt;Ref(PFO,-1), Ref(HHV(PFC,1),-1)-1, IIf(\r\nRef(PFc,-1)&lt;Ref(PFO,-1), Ref(LLV(PFC,1),-1)+1, PFO ) )*box;\r\n\r\n// the difference between Open AND Close is set to box size\r\n// the sign decides if X or O are plotted\r\nC = O + box * IIf( PFC &gt; PFO, 1, -1 );\r\n\r\ntop = H - box/2;\r\nbot = L + box/2;\r\n\r\n\r\nGraphXSpace = 5;\r\n//Title = Name() + " " + Now(1) + ": PF System, H: $" + Top + (for today's date)\r\n\r\n_N( \r\nTitle = Name() + " " + Date() + ": PF System, H: $" + Top + ", L: $" + Bot + ",\r\nBox $" + Box + " Reversal " + rev + "\\n" + "NewCol bar " + BarTurns + " date\r\n" + WriteVal(\r\nValueWhen(BarIndex()==SelectedValue(BarTurns),DateTime()),formatDateTime)  + "\r\nColEnd bar " + BarEnds + " date " + WriteVal(\r\nValueWhen(BarIndex()==SelectedValue(BarEnds),DateTime()),formatDateTime) \r\n  );\r\n\r\nPlot(C, "P&amp;F Close", IIf( PFC &gt; PFO, colorBlue, colorRed ), styleCandle +\r\nstylePointAndFigure);\r\n\r\n\r\nLineUp = LineArray( SelectedValue(BarIndex()), SelectedValue(L),\r\nSelectedValue(BarIndex())+1, SelectedValue(L)+box, 1, 0 );\r\nLinedown = LineArray( SelectedValue(BarIndex()), SelectedValue(H),\r\nSelectedValue(BarIndex())+1, SelectedValue(H)-box, 1, 0 );\r\nPlot(IIf(SelectedValue(PFC&lt;PFO),Lineup,Null), "Line", colorGreen, styleLine +\r\nstyleNoLabel + styleNoRescale);\r\nPlot(IIf(SelectedValue(PFC&gt;PFO),Linedown,Null), "Line", colorBrown, styleLine +\r\nstyleNoLabel + styleNoRescale);\r\n\r\n//--Indicator-End-- \r\nName() +", "+FullName();\r\n"";\r\n"Direction  = " + WriteIf(pfc&gt;pfo,"Up","Down");\r\n"Move Today = " + WriteIf(BarIndex()==SelectedValue(BarEnds),"Yes" +\r\nWriteIf(BarIndex()==SelectedValue(BarTurns),", New Column", ",\r\nContinuation"),"No");\r\n"";\r\n"Column Start \\n   BarIndex() = " + BarTurns + "\\n   Date() = " + WriteVal(\r\nValueWhen(BarIndex()==SelectedValue(BarTurns), DateTime()), formatDateTime) ;\r\n"Column End \\n   BarIndex() = " + BarEnds + "\\n   Date() = " + WriteVal(\r\nValueWhen(BarIndex()==SelectedValue(BarEnds),DateTime()),formatDateTime)   ;\r\n</Formula>
+			<FilePath>C:\\Users\\ksdee\\Documents\\PersonalFinance\\Trading\\Trading\\src\\point_and_figure.afl</FilePath>
+			<Flags>256</Flags>
+			<MoreFlags>268435457</MoreFlags>
+			<Min>-48.15</Min>
+			<Max>1348.84</Max>
 		</Pane>
 	</Sheet>
 	<Sheet>

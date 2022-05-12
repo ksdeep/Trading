@@ -1,0 +1,51 @@
+
+
+Filter = Close > 0;
+
+
+delVol_check = Aux1 > Ref( Aux1, - 1 ) AND Ref( Aux1, -1 ) > Ref( Aux1, -2 ) and Ref( Aux1, -2 ) > Ref( Aux1, -3 ) AND Ref( Aux1, -3 ) > Ref( Aux1, -4 ) 
+			   AND Volume > Ref( Volume, - 1 ) AND Ref( Volume, -1 ) > Ref( Volume, -2 ) and Ref( Volume, -2 ) > Ref( Volume, -3 ) AND Ref( Volume, -3 ) > Ref( Volume, -4 );
+AddColumn( delVol_check, "Incresing Trade and Volume last 5 days", 1.2, colorBlack, IIf( delVol_check, colorGreen, colorLightGrey ), width = 100 );
+
+
+
+
+
+base = "NSENIFTY";
+relStrng = RelStrength( base );
+relStrng_check = relStrng > Ref(relStrng,-1) AND Ref(relStrng,-1) > Ref(relStrng,-2) AND Ref(relStrng,-2) > Ref(relStrng,-3)  AND Ref(relStrng,-3) > Ref(relStrng,-4);
+AddColumn( relStrng_check, "Last 5 days increase relative strength against nifty", 1.2, colorBlack, IIf( relStrng_check, colorGreen, colorLightGrey ), width = 100 );
+
+
+
+
+
+
+
+TimeFrameSet(inWeekly);
+iO= Foreign(base, "O");
+iC= Foreign(base, "C");
+iR = (iC-iO)/iO;
+sR = (C-O)/O;
+wkRtrn = sR > iR;
+volInc = Volume > Ref(Volume,-1) AND Aux1 > Ref(Aux1, -1);
+TimeFrameRestore();
+
+TimeFrameSet(2160001*3);
+iO= Foreign(base, "O");
+iC= Foreign(base, "C");
+iR = (iC-iO)/iO;
+sR = (C-O)/O;
+qtrRtrn = sR > iR;
+TimeFrameRestore();
+
+iO= Foreign(base, "O");
+iC= Foreign(base, "C");
+iR = (iC-iO)/iO;
+sR = (C-O)/O;
+
+relReturn = sR > iR AND wkRtrn AND qtrRtrn;
+AddColumn( relReturn, "weekly and 3 month returns more then Nifty", 1.2, colorBlack, IIf( relReturn, colorGreen, colorLightGrey ), width = 100 );
+
+AddColumn( volInc, "weekly volume and delevery increase", 1.2, colorBlack, IIf( volInc, colorGreen, colorLightGrey ), width = 100 );
+
