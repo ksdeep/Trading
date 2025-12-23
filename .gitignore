@@ -1,2 +1,4 @@
 *.ini
 *.csv
+*.log
+*.pyc
