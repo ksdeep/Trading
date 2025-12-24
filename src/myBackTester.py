@@ -9,19 +9,11 @@ def roc(series, period):
 symbols = ['RELIANCE', 'TCS', 'WIPRO', 'HDFCBANK', 'TITAN']
 data = {}
 
-for sym in symbols:
-    df = pd.read_csv(STOCK_DIR / f"{sym}.csv", parse_dates=['date'])
-    df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
-    df = df.sort_values('date').set_index('date')
 
-    df['ema50'] = ema(df['close'], 50)
-    df['ema100'] = ema(df['close'], 100)
-    df['ema200'] = ema(df['close'], 200)
-    df['roc5'] = roc(df['close'], 5)
-
-    data[sym] = df
 
 initial_cash = 100000
+start = datetime(2010, 1, 1)
+end = datetime(2020, 12, 31)
 cash = initial_cash
 positions = {}      # symbol -> position dict
 active_trades = {}  # symbol -> trade dict
@@ -36,12 +28,32 @@ trading_days = 365
 pending_buy = {}
 pending_sell = set()
 signal_date = {}
+data_start_date = start - timedelta(365*2)
+
+for sym in symbols:
+    df = pd.read_csv(STOCK_DIR / f"{sym}.csv", parse_dates=['date'])
+    df = df[['date', 'open', 'high', 'low', 'close', 'volume']]
+    df = df.sort_values('date').set_index('date')
+    df = df.loc[((df.index>=data_start_date) & (df.index<=end)),:]
+
+    df['ema50'] = ema(df['close'], 50)
+    df['ema100'] = ema(df['close'], 100)
+    df['ema200'] = ema(df['close'], 200)
+    df['roc5'] = roc(df['close'], 5)
+
+    data[sym] = df
 
 dates = sorted(set().union(*[df.index for df in data.values()]))
 
 last_week = None
 
+
+
+
 for date in dates:
+    if not (date >=start and date<=end):
+        # dates outside back test dates. 
+        continue
     current_week = date.isocalendar()[1]
     new_week = last_week is not None and current_week != last_week
     
