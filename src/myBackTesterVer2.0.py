@@ -5,7 +5,85 @@ def ema(series, period):
 
 def roc(series, period):
     return series.pct_change(periods=period)
+def get_position_for_symbol(lv_symbol : str, lv_equity : float,
+                            lv_initial_cash : float, lv_current_cash : float, 
+                            lv_df_ohlc : pd.DataFrame, lv_capital_fraction : float,
+                            lf_dt_current_day : datetime, lv_position_size_type : int,
+                            lv_existing_positions : dict, lv_reason : str ='') -> dict:
+    """
+    lv_symbol : str : stock symbol for which position to be calculated
+    lv_equity : float : current equity value
+    lv_initial_cash : float : initial cash value at start of backtest
+    lv_current_cash : float : current available cash value
+    lv_df_ohlc : pd.DataFrame : dataframe containing ohlc data for the symbol
+    lv_capital_fraction : float : fraction of capital to be used for position sizing
+    lf_dt_current_day : datetime : current date for which position is to be calculated
+    lv_position_size_type : int : type of position sizing method
 
+    Determine the number of shares to buy for a given symbol based on equity, cash, and position sizing rules.
+    1 -  Fixed position size based on initial cash and capital fraction.
+    2 -  Variable position size based on current equity and capital fraction.
+    3 -  Check if there is existing positions then only take 1/2 of existing position 
+    4 -  Volatility based position sizing , OHLC should have ATR column precomputed.
+    allways check if there is sufficient cash available to take the position.
+
+    Retuns a dictionary with number of shares to buy and reason.
+
+    """
+    if lv_position_size_type == 1:
+        lv_position_value = lv_initial_cash * lv_capital_fraction
+        lv_num_shares = math.floor(lv_position_value / lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0])
+        lv_reason = f'Fixed position size based on initial cash {lv_initial_cash} and capital fraction {lv_capital_fraction}.' +  lv_reason
+        if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+            lv_num_shares = math.floor(lv_current_cash / lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0])
+            lv_reason = f'Adjusted position size based on available cash {lv_current_cash} and capital fraction {lv_capital_fraction}' +  lv_reason
+            if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+                lv_num_shares = 0
+                lv_reason = f'No sufficient cash available to take position.' +  lv_reason
+        return {'num_shares': lv_num_shares, 'reason': lv_reason}
+    elif lv_position_size_type == 2:
+        lv_position_value = lv_equity * lv_capital_fraction
+        lv_num_shares = math.floor(lv_position_value / lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0])
+        lv_reason = f'Variable position size based on current equity {lv_equity} and capital fraction {lv_capital_fraction}' +  lv_reason
+        if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+            lv_num_shares = math.floor(lv_current_cash / lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0])
+            lv_reason = f'Adjusted position size based on available cash {lv_current_cash} and capital fraction {lv_capital_fraction}' +  lv_reason
+            if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+                lv_num_shares = 0
+                lv_reason = f'No sufficient cash available to take position.' +  lv_reason
+        return {'num_shares': lv_num_shares, 'reason': lv_reason}
+    elif lv_position_size_type == 3:
+        for existing_position_symbol, existing_position_details in lv_existing_positions.items():
+            if existing_position_symbol == lv_symbol:
+                existing_num_shares = existing_position_details['num_shares']
+                lv_num_shares = math.floor(existing_num_shares / 2)
+                lv_reason = f'Existing position found for {lv_symbol}. Taking half of existing position size {existing_num_shares}' +  lv_reason
+                if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+                    lv_num_shares = math.floor(lv_current_cash / lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0])
+                    lv_reason = f'Adjusted position size based on available cash {lv_current_cash} and existing position size.' +  lv_reason
+                    if lv_num_shares * lv_df_ohlc.loc[lf_dt_current_day,'high'].values[0] > lv_current_cash:
+                        lv_num_shares = 0
+                        lv_reason = f'No sufficient cash available to take position.' +  lv_reason  
+                return {'num_shares': lv_num_shares, 'reason': lv_reason}
+        # no existing position found
+        # fall back to fixed position sizing, calling the same function with type 1
+        return get_position_for_symbol(lv_symbol, lv_equity, lv_initial_cash, lv_current_cash, 
+                                       lv_df_ohlc, lv_capital_fraction, lf_dt_current_day, 1, 
+                                       lv_existing_positions, lv_reason='No existing position found so switching to fixed position sizing.')
+    elif lv_position_size_type == 4:
+        if 'atr' not in lv_df_ohlc.columns:
+            return get_position_for_symbol(lv_symbol, lv_equity, lv_initial_cash, 
+                                           lv_current_cash, lv_df_ohlc, lv_capital_fraction, 
+                                           lf_dt_current_day, 1, lv_existing_positions, lv_reason='No ATR data found so switching to fixed position sizing.')
+            
+        atr_value = lv_df_ohlc.loc[lf_dt_current_day,'atr'].values[0]
+        if atr_value == 0:
+            return get_position_for_symbol(lv_symbol, lv_equity, lv_initial_cash, 
+                                           lv_current_cash, lv_df_ohlc, lv_capital_fraction, 
+                                           lf_dt_current_day, 1, lv_existing_positions, 
+                                           lv_reason=f'ATR is zero for {lv_symbol} on {lf_dt_current_day} so switching to fixed position sizing.')   
+        price_per_share = lv_df_ohlc.loc[lf_dt_current_day,['open','close','high','low']].mean(axis=1).values[0]  
+        
 symbols = ['RELIANCE', 'TCS', 'WIPRO', 'HDFCBANK', 'TITAN']
 
 
@@ -92,6 +170,9 @@ while current_day <= end_back_test:
                 if len(positions)>=max_positions:
                     value['signal_processed_message'] = 'Not considered - max positions reached'
                 else:
+                    get_position_for_symbol(symbol=value['symbol'], equity = equity_value, 
+                                            cash_value = cash, ohlc = data[value['symbol']], 
+                                            position_size_fixed = position_size_fixed, current_day=current_day)
                     None
                 value['signal_processed'] = True
                 all_signals[key] = value
