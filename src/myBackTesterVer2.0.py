@@ -1,4 +1,16 @@
 from GetFreshMarketData import *
+import matplotlib.pyplot as plt
+import logging
+
+logging.basicConfig(
+    filename=TEMP/'backTester.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+     force=True
+)
+
+logging.info("Starting backtester ver 2.0")
+
 
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
@@ -13,6 +25,7 @@ def atr(df, period=14):
     tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
+
 
 
 def get_position_for_symbol(lv_symbol : str, lv_equity : float,
@@ -143,7 +156,146 @@ def rank_candidate_signals(lv_pending_buy: dict,
     
     return lv_sorted_pending_buy_unique
         
+def calculate_monthly_performance(current_year: int, current_month: int,
+                                  lv_trades: dict,
+                                    lv_cash_equity_history: dict,
+                                    lv_positions: dict):
+    """
+    Calculate and log the monthly performance of the backtest.
+    """
+    global logger
+    logger.info(f'Calculating monthly performance for {current_year}-{current_month:02d}')
+    None
+def calculate_annual_performance(current_year: int, current_month: int,
+                                  lv_trades: dict,
+                                    lv_cash_equity_history: dict,
+                                    lv_positions: dict):
+    """
+    Calculate and log the annual performance of the backtest.
+    """
+    global logger
+    logger.info(f'Calculating annual performance for {current_year}')
+    None
+def generate_back_test_performance_report(lv_trades: dict,
+                                          lv_cash_equity_history: dict,
+                                          lv_initial_cash: int,
+                                          lv_start_date: datetime,
+                                          lv_end_date: datetime):
+    """
+    Generate and log the overall performance report of the backtest.
+    """
+    global logger
+    logger.info(f'Generating overall backtest performance report')
+    
+    cash_df = pd.DataFrame(lv_cash_equity_history).T
+    trades_df = pd.DataFrame(lv_trades).T
+    trades_df.buy_date = pd.to_datetime(trades_df.buy_date)
+    trades_df.sell_date = pd.to_datetime(trades_df.sell_date)
 
+    # --- 2. Calculate Equity & Drawdown Curves ---
+    equity_curve = cash_df['equity']
+    
+    # Calculate Running Maximum
+    running_max = equity_curve.cummax()
+
+    # Calculate Drawdown (%)
+    drawdown = (equity_curve - running_max) / running_max
+
+    # --- 3. Calculate Performance Metrics ---
+    
+    # Time Calculations
+    start_date = equity_curve.index[0]
+    end_date = equity_curve.index[-1]
+    total_days = (end_date - start_date).days
+    years = total_days / 365.25
+
+    # CAGR
+    final_equity = equity_curve.iloc[-1]
+    cagr = (final_equity / lv_initial_cash) ** (1 / years) - 1
+
+    # Max Drawdown
+    max_dd = drawdown.min()
+
+    # Max Drawdown Duration (Time between new equity highs)
+    highs = equity_curve[equity_curve == running_max].index
+    if len(highs) > 1:
+        max_dd_duration_days = pd.Series(highs).diff().dt.days.max()
+    else:
+        max_dd_duration_days = total_days
+    
+    # Daily Returns for Risk Metrics
+    daily_returns = equity_curve.pct_change().dropna()
+    
+    # Sharpe Ratio (assuming 0% risk-free rate for simplicity)
+    # Annualized by sqrt(252)
+    sharpe_ratio = np.sqrt(252) * (daily_returns.mean() / daily_returns.std())
+
+    # Sortino Ratio (punishes only negative volatility)
+    negative_returns = daily_returns[daily_returns < 0]
+    sortino_ratio = np.sqrt(252) * (daily_returns.mean() / negative_returns.std())
+
+    # Trade Statistics
+    total_trades = len(trades_df)
+    winning_trades = trades_df[trades_df['profit_loss_amount'] > 0]
+    losing_trades = trades_df[trades_df['profit_loss_amount'] <= 0]
+    
+    win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
+    
+    gross_profit = winning_trades['profit_loss_amount'].sum()
+    gross_loss = abs(losing_trades['profit_loss_amount'].sum())
+    profit_factor = gross_profit / gross_loss if gross_loss != 0 else np.inf
+    
+    avg_profit_per_trade = trades_df['profit_loss_amount'].mean()
+
+    # --- 4. Print Results ---
+    print("-" * 30)
+    print("PERFORMANCE REPORT")
+    print("-" * 30)
+    print(f"Start Date:       {lv_start_date.date()}")
+    print(f"End Date:         {lv_end_date.date()}")
+    print(f"Duration:         {years:.2f} years")
+    print(f"Initial Capital:  {lv_initial_cash:,.2f}")
+    print(f"Final Equity:     {final_equity:,.2f}")
+    print(f"CAGR:             {cagr:.2%}")
+    print(f"Max Drawdown:     {max_dd:.2%}")
+    print(f"CAR/MDD:          {cagr / -max_dd if max_dd != 0 else np.inf:.2f}")
+    print(f"Max DD Duration:  {max_dd_duration_days:.0f} days")
+    print(f"Sharpe Ratio:     {sharpe_ratio:.2f}")
+    print(f"Sortino Ratio:    {sortino_ratio:.2f}")
+    print("-" * 30)
+    print("TRADE STATISTICS")
+    print("-" * 30)
+    print(f"Total Trades:     {total_trades}")
+    print(f"Win Rate:         {win_rate:.2%}")
+    print(f"Profit Factor:    {profit_factor:.2f}")
+    print(f"Avg Trade P/L:    {avg_profit_per_trade:.2f}")
+
+    # --- 4. Plotting (Fixed for the TypeError) ---
+    plt.figure(figsize=(12, 10))
+
+    # Subplot 1: Equity Curve
+    plt.subplot(2, 1, 1)
+    plt.plot(equity_curve.index, equity_curve.values, label='Equity', color='blue')
+    plt.title('Equity Curve')
+    plt.ylabel('Capital')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    # Subplot 2: Drawdown Curve
+    plt.subplot(2, 1, 2)
+    # FIX: Use .index and .values explicitly to avoid type issues in fill_between
+    plt.plot(drawdown.index, drawdown.values, label='Drawdown', color='red')
+    # plt.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.3)
+    
+    plt.title('Drawdown Curve')
+    plt.ylabel('Drawdown %')
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('backtest_report.png')
+    plt.show()
 
 
 
@@ -160,7 +312,7 @@ data = {}
 
 
 
-symbols = ['RELIANCE', 'TCS', 'WIPRO', 'HDFCBANK', 'TITAN']
+symbols = ['RELIANCE', 'TCS', 'OIL', 'HDFCBANK', 'TITAN']
 start_back_test = datetime(2007, 1, 1)
 end_back_test = datetime(2024, 12, 31)
 max_positions = 8
@@ -171,7 +323,7 @@ trading_days = 365
 stop_loss_pct = 0.10 # stop loss percentage
 which_days_to_trade = [0] # 0: Monday 6 : Sunday. list all days you would like to trade. 
 signal_strength_checked_on_trading_day = True # mark false if singal strength to be check during generationan and not during placing orders 
-position_szie_type = 1   # 1 - fixed based on initial cash and capital fraction, 2 - variable based on current equity and capital fraction, 3 - based on existing position size, 4 - volatility based position sizing using ATR.
+position_szie_type = 4   # 1 - fixed based on initial cash and capital fraction, 2 - variable based on current equity and capital fraction, 3 - based on existing position size, 4 - volatility based position sizing using ATR.
 allow_multiple_position_for_same_stock = False # mark true if multiple entries allowed else false.
 
 initial_cash = 100000
@@ -199,7 +351,7 @@ for sym in symbols:
     if len(dates)==0:
         dates = dates.union(df.index.date)
     else:
-        dates = dates.intersection(set(df.index.date))
+        dates = dates.union(set(df.index.date))
 
 
 dates =  pd.Series(list(dates)).sort_values().to_list()
@@ -210,168 +362,189 @@ current_day = start_back_test
 # note - signal generation happens everyday but trade execution happens only on specified days of week. 
 # also the signals are generted frist and then exectuted on next trading day. signals are never executed on the same day.
 day_activity = ''
-while current_day <= end_back_test:
-    if current_day.date() not in dates: # market not open no action. 
-        # print(f'not a trading day {current_day}')        
-        daily_interest = cash * annual_interest/trading_days
-        cash = cash + daily_interest
-        equity_value = equity_value +  daily_interest
-        day_activity = 'Market closed - no action'
-        cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity}
-        current_day += timedelta(days=1)
-        continue
-    day_activity = ''
-    # check if the current day is a trade execution day then execute the buy and sell signals. 
-    if current_day.weekday() in which_days_to_trade and current_day != start_back_test :
-        # print(current_day,'Trade execution day')
-        if len(pending_sell)>0: # check if there are any item pending for sell
-            # look through all pending sell items check if they have any matching position and trade then peform the reverse trade to close the trade. 
-            for key, value in pending_sell.items():
-                # write the code here after data structure of pending sell and position is ready. 
-                # after sell transaction need to increase the cash amount. 
-                # after sell transaction need to remove the position from positions dict.
-                # after sell traction need to put the trade in completed trades list.
-                sell_symbol = value['symbol']
-                position_to_remove = [] # to handle multiple positions for same stock if allowed.
-                for position_key, position_details in positions.items():
-                    position_symbol = position_details['symbol']
-                    if position_symbol == sell_symbol:
-                        position_to_remove.append(position_key)
-                        buy_price = position_details['buy_price']
-                        num_shares = position_details['num_shares']
-                        sell_price = data[sell_symbol].loc[current_day,['close','open','high','low']].mean()
-                        position_value_at_exit = num_shares * sell_price * (1 - commission)
-                        profit_loss_amount = position_value_at_exit - position_details['position_cost']
-                        profit_loss_pct = profit_loss_amount / position_details['position_cost']
-                        cash = cash + position_value_at_exit    
-                        trades[position_key]['position_value_at_exit'] = position_value_at_exit
-                        trades[position_key]['sell_date'] = current_day.date()
-                        trades[position_key]['sell_price'] = sell_price 
-                        trades[position_key]['pct_change_in_price'] = (sell_price - buy_price) / buy_price
-                        trades[position_key]['profit_loss_amount'] = profit_loss_amount
-                        trades[position_key]['profit_loss_pct'] = profit_loss_pct
-                        trades[position_key]['number_of_days_held'] = (current_day.date() - position_details['buy_date']).days
-                        trades[position_key]['trade_completed'] = True
-                        trades[position_key]['type_of_exit'] = value['signal_type']
-                        value['signal_processed_message'] = f'Sell executed for {num_shares} shares at price {sell_price}'
-                        value['signal_processed'] = True
-                        day_activity = day_activity + f'; Date {current_day.date()} Sell executed on symbol {sell_symbol} for {num_shares} shares at price {sell_price:.2f}, postion value at exit {position_value_at_exit:.2f}, total P/L: {profit_loss_amount:.2f} ({profit_loss_pct*100:.2f}%)'
-                for pos_key in position_to_remove:
-                    del positions[pos_key]
-                all_signals[key] = value
-            pending_sell.clear()        
-        if len(pending_buy)>0: #check if there are items to buy and execute them. 
-            # look through all the pending buy items and check if we have capacity to buy more positions.   
-            # after buy transaction need to decrease the cash amount.
-            # need to check the signal strength on the day of trade execution if the flag is set. 
-            # need to add the position to positions dict.
-            # decide how much position to buy based on capital fraction and available cash and position_size_fixed flag. if fixed then buy fixed amount based  on initial cash. 
-            # else buy based on current equity * capital fraction. if this then need to check if cash is available to buy that amount.
-            pending_buy = rank_candidate_signals(pending_buy, current_day, data)
-            for key, value in pending_buy.items():
-                # write the code here after data structure of pending buy and position is ready. 
-                if len(positions)>=max_positions:
-                    value['signal_processed_message'] = 'Not considered - max positions reached'
-                    value['signal_processed'] = True
-                else:
-                    position_size_dict = get_position_for_symbol(
-                        lv_symbol = value['symbol'],
-                        lv_equity = equity_value,
-                        lv_initial_cash = initial_cash, 
-                        lv_current_cash = cash,
-                        lv_df_ohlc = data[value['symbol']],
-                        lv_capital_fraction = capital_fraction,    
-                        lf_dt_current_day = current_day,
-                        lv_position_size_type = position_szie_type,
-                        lv_existing_positions = positions,  
-                        lv_reason = '')
-                    num_shares_to_buy = position_size_dict['num_shares']
-                    reason_for_position_size = position_size_dict['reason']
-                    
-                    print(f"On {current_day.date()} for symbol {value['symbol']} determined position size to buy is {num_shares_to_buy} shares. Reason: {reason_for_position_size}")
+current_month = current_day.month
+current_year = current_day.year
 
-                    position_cost = num_shares_to_buy * data[value['symbol']].loc[current_day,['close','open','high','low']].mean() * (1 + commission)
-                    if num_shares_to_buy >0 and position_cost <= cash:
-                        # proceed with buy
-                        cash = cash - position_cost
-                        position_key = f"{value['symbol']}_{current_day.strftime('%Y%m%d')}"
-                        positions[position_key] = {'symbol': value['symbol'],
-                                        'num_shares': num_shares_to_buy,
-                                        'buy_date': current_day.date(),
-                                        'buy_price': data[value['symbol']].loc[current_day,['close','open','high','low']].mean(),
-                                        'position_cost': position_cost,
-                                        'position_reason': reason_for_position_size
-                                        }
-                        trades[position_key] = {'symbol': value['symbol'],
-                                        'num_shares': num_shares_to_buy,
-                                        'buy_date': current_day.date(),
-                                        'buy_price': data[value['symbol']].loc[current_day,['close','open','high','low']].mean(),
-                                        'sell_date': None,
-                                        'sell_price': None,
-                                        'pct_change_in_price': None,
-                                        'profit_loss_amount': None,
-                                        'profit_loss_pct': None,
-                                        'position_value_at_entry': position_cost,
-                                        'position_value_at_exit': None,
-                                        'number_of_days_held': None,
-                                        'trade_completed': False,
-                                        'type_of_exit': None,
-                                        'type_of_trade': 'LONG'
-                                        }
-                        day_activity = day_activity + f'; Date {current_day.date()} Buy executed on symbol {value["symbol"]} for {num_shares_to_buy} shares at price {data[value["symbol"]].loc[current_day,["close","open","high","low"]].mean():.2f},position cost {position_cost:.2f}'
-                        all_positions[position_key] = positions[position_key]
-                        value['signal_processed_message'] = f'Buy executed for {num_shares_to_buy} shares at price {data[value["symbol"]].loc[current_day,["close","open","high","low"]].mean()}'
+with tqdm(total=(end_back_test - start_back_test).days) as pbar:
+    while current_day <= end_back_test:
+        if current_day.date() not in dates: # market not open no action. 
+            # print(f'not a trading day {current_day}')        
+            daily_interest = cash * annual_interest/trading_days
+            cash = cash + daily_interest
+            equity_value = equity_value +  daily_interest
+            day_activity = 'Market closed - no action'
+            cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity}
+            current_day += timedelta(days=1)
+            if current_day.month != current_month:
+                calculate_monthly_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+                current_month = current_day.month
+            if current_day.year != current_year:
+                calculate_annual_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+                current_year = current_day.year
+            pbar.update(1) 
+            continue
+        day_activity = ''
+        # check if the current day is a trade execution day then execute the buy and sell signals. 
+        if current_day.weekday() in which_days_to_trade and current_day != start_back_test :
+            # print(current_day,'Trade execution day')
+            if len(pending_sell)>0: # check if there are any item pending for sell
+                # look through all pending sell items check if they have any matching position and trade then peform the reverse trade to close the trade. 
+                for key, value in pending_sell.items():
+                    # write the code here after data structure of pending sell and position is ready. 
+                    # after sell transaction need to increase the cash amount. 
+                    # after sell transaction need to remove the position from positions dict.
+                    # after sell traction need to put the trade in completed trades list.
+                    sell_symbol = value['symbol']
+                    position_to_remove = [] # to handle multiple positions for same stock if allowed.
+                    for position_key, position_details in positions.items():
+                        position_symbol = position_details['symbol']
+                        if position_symbol == sell_symbol:
+                            position_to_remove.append(position_key)
+                            buy_price = position_details['buy_price']
+                            num_shares = position_details['num_shares']
+                            sell_price = data[sell_symbol].loc[current_day,['close','open','high','low']].mean()
+                            position_value_at_exit = num_shares * sell_price * (1 - commission)
+                            profit_loss_amount = position_value_at_exit - position_details['position_cost']
+                            profit_loss_pct = profit_loss_amount / position_details['position_cost']
+                            cash = cash + position_value_at_exit    
+                            trades[position_key]['position_value_at_exit'] = position_value_at_exit
+                            trades[position_key]['sell_date'] = current_day.date()
+                            trades[position_key]['sell_price'] = sell_price 
+                            trades[position_key]['pct_change_in_price'] = (sell_price - buy_price) / buy_price
+                            trades[position_key]['profit_loss_amount'] = profit_loss_amount
+                            trades[position_key]['profit_loss_pct'] = profit_loss_pct
+                            trades[position_key]['number_of_days_held'] = (current_day.date() - position_details['buy_date']).days
+                            trades[position_key]['trade_completed'] = True
+                            trades[position_key]['type_of_exit'] = value['signal_type']
+                            value['signal_processed_message'] = f'Sell executed for {num_shares} shares at price {sell_price}'
+                            value['signal_processed'] = True
+                            day_activity = day_activity + f'; Date {current_day.date()} Sell executed on symbol {sell_symbol} for {num_shares} shares at price {sell_price:.2f}, postion value at exit {position_value_at_exit:.2f}, total P/L: {profit_loss_amount:.2f} ({profit_loss_pct*100:.2f}%)'
+                    for pos_key in position_to_remove:
+                        del positions[pos_key]
+                    all_signals[key] = value
+                pending_sell.clear()        
+            if len(pending_buy)>0: #check if there are items to buy and execute them. 
+                # look through all the pending buy items and check if we have capacity to buy more positions.   
+                # after buy transaction need to decrease the cash amount.
+                # need to check the signal strength on the day of trade execution if the flag is set. 
+                # need to add the position to positions dict.
+                # decide how much position to buy based on capital fraction and available cash and position_size_fixed flag. if fixed then buy fixed amount based  on initial cash. 
+                # else buy based on current equity * capital fraction. if this then need to check if cash is available to buy that amount.
+                pending_buy = rank_candidate_signals(pending_buy, current_day, data)
+                for key, value in pending_buy.items():
+                    # write the code here after data structure of pending buy and position is ready. 
+                    if len(positions)>=max_positions:
+                        value['signal_processed_message'] = 'Not considered - max positions reached'
                         value['signal_processed'] = True
                     else:
-                        value['signal_processed_message'] = 'Not executed - insufficient cash to take position'
-                        value['signal_processed'] = True                
-                all_signals[key] = value
-            pending_buy.clear()                
-    # for all days need to check and generate buy and sell signals.
+                        position_size_dict = get_position_for_symbol(
+                            lv_symbol = value['symbol'],
+                            lv_equity = equity_value,
+                            lv_initial_cash = initial_cash, 
+                            lv_current_cash = cash,
+                            lv_df_ohlc = data[value['symbol']],
+                            lv_capital_fraction = capital_fraction,    
+                            lf_dt_current_day = current_day,
+                            lv_position_size_type = position_szie_type,
+                            lv_existing_positions = positions,  
+                            lv_reason = '')
+                        num_shares_to_buy = position_size_dict['num_shares']
+                        reason_for_position_size = position_size_dict['reason']
+                        
+                        logging.info(f"On {current_day.date()} for symbol {value['symbol']} determined position size to buy is {num_shares_to_buy} shares. Reason: {reason_for_position_size}")
 
-    for sym, df in data.items():
-        current_day_df = df.loc[df.index.date == current_day.date()]
-        if current_day_df.empty:
-            continue
-        key = f"{sym}_{current_day.strftime('%Y%m%d')}"
-        row = current_day_df.iloc[0]
-        if row['close'] < row['ema100']:
-            pending_sell[key] = {'symbol': sym,
+                        position_cost = num_shares_to_buy * data[value['symbol']].loc[current_day,['close','open','high','low']].mean() * (1 + commission)
+                        if num_shares_to_buy >0 and position_cost <= cash:
+                            # proceed with buy
+                            cash = cash - position_cost
+                            position_key = f"{value['symbol']}_{current_day.strftime('%Y%m%d')}"
+                            positions[position_key] = {'symbol': value['symbol'],
+                                            'num_shares': num_shares_to_buy,
+                                            'buy_date': current_day.date(),
+                                            'buy_price': data[value['symbol']].loc[current_day,['close','open','high','low']].mean(),
+                                            'position_cost': position_cost,
+                                            'position_reason': reason_for_position_size
+                                            }
+                            trades[position_key] = {'symbol': value['symbol'],
+                                            'num_shares': num_shares_to_buy,
+                                            'buy_date': current_day.date(),
+                                            'buy_price': data[value['symbol']].loc[current_day,['close','open','high','low']].mean(),
+                                            'sell_date': None,
+                                            'sell_price': None,
+                                            'pct_change_in_price': None,
+                                            'profit_loss_amount': None,
+                                            'profit_loss_pct': None,
+                                            'position_value_at_entry': position_cost,
+                                            'position_value_at_exit': None,
+                                            'number_of_days_held': None,
+                                            'trade_completed': False,
+                                            'type_of_exit': None,
+                                            'type_of_trade': 'LONG'
+                                            }
+                            day_activity = day_activity + f'; Date {current_day.date()} Buy executed on symbol {value["symbol"]} for {num_shares_to_buy} shares at price {data[value["symbol"]].loc[current_day,["close","open","high","low"]].mean():.2f},position cost {position_cost:.2f}'
+                            all_positions[position_key] = positions[position_key]
+                            value['signal_processed_message'] = f'Buy executed for {num_shares_to_buy} shares at price {data[value["symbol"]].loc[current_day,["close","open","high","low"]].mean()}'
+                            value['signal_processed'] = True
+                        else:
+                            value['signal_processed_message'] = 'Not executed - insufficient cash to take position'
+                            value['signal_processed'] = True                
+                    all_signals[key] = value
+                pending_buy.clear()                
+        # for all days need to check and generate buy and sell signals.
+
+        for sym, df in data.items():
+            current_day_df = df.loc[df.index.date == current_day.date()]
+            if current_day_df.empty:
+                continue
+            key = f"{sym}_{current_day.strftime('%Y%m%d')}"
+            row = current_day_df.iloc[0]
+            if row['close'] < row['ema100']:
+                pending_sell[key] = {'symbol': sym,
+                                    'signal_date': current_day.date(),
+                                    'signal_type': 'SELL',
+                                    'signal_processed': False,
+                                    'signal_processed_message': 'Generated'
+                                    }   
+                day_activity = day_activity + f'; Date {current_day.date()} Sell signal generated for symbol {sym} as close {row["close"]:.2f} < ema100 {row["ema100"]:.2f}'
+                
+            if (row['close'] > row['ema50'] and row['ema100'] > row['ema200']):
+                pending_buy[key] = {'symbol': sym,
                                 'signal_date': current_day.date(),
-                                'signal_type': 'SELL',
-                                'signal_processed': False,
-                                'signal_processed_message': 'Generated'
-                                }   
-            day_activity = day_activity + f'; Date {current_day.date()} Sell signal generated for symbol {sym} as close {row["close"]:.2f} < ema100 {row["ema100"]:.2f}'
-            
-        if (row['close'] > row['ema50'] and row['ema100'] > row['ema200']):
-            pending_buy[key] = {'symbol': sym,
-                               'signal_date': current_day.date(),
-                                'signal_type': 'BUY',
-                                'signal_processed': False,
-                                'signal_processed_message': 'Generated'
-                               }
-            day_activity = day_activity + f'; Date {current_day.date()} Buy signal generated for symbol {sym} as close {row["close"]:.2f} > ema50 {row["ema50"]:.2f} and ema100 {row["ema100"]:.2f} > ema200 {row["ema200"]:.2f}'
-    for key, value in positions.items():
-        buy_price = value['buy_price']
-        symbol = value['symbol']
-        current_price = data[symbol].loc[current_day, 'low']
-        pct_change = (current_price - buy_price) / buy_price 
-        if pct_change <= -stop_loss_pct:
-            pending_sell[key] = {'symbol': value['symbol'],
-                                'signal_date': current_day.date(),
-                                'signal_type': 'STOP_LOSS_SELL',
-                                'signal_processed': False,
-                                'signal_processed_message': 'Generated due to stop loss'
+                                    'signal_type': 'BUY',
+                                    'signal_processed': False,
+                                    'signal_processed_message': 'Generated'
                                 }
-            day_activity = day_activity + f'; Date {current_day.date()} Stop Loss Sell signal generated for symbol {symbol} as price dropped to {current_price:.2f} which is {pct_change*100:.2f}% below buy price {buy_price:.2f}'
+                day_activity = day_activity + f'; Date {current_day.date()} Buy signal generated for symbol {sym} as close {row["close"]:.2f} > ema50 {row["ema50"]:.2f} and ema100 {row["ema100"]:.2f} > ema200 {row["ema200"]:.2f}'
+        for key, value in positions.items():    
+            symbol = value['symbol']
+            selected_low = data[symbol].loc[data[symbol].index.date <= current_day.date(), 'low'].iloc[-1]    
+            buy_price = value['buy_price']
+            
+            current_price = selected_low
+            pct_change = (current_price - buy_price) / buy_price 
+            if pct_change <= -stop_loss_pct:
+                pending_sell[key] = {'symbol': value['symbol'],
+                                    'signal_date': current_day.date(),
+                                    'signal_type': 'STOP_LOSS_SELL',
+                                    'signal_processed': False,
+                                    'signal_processed_message': 'Generated due to stop loss'
+                                    }
+                day_activity = day_activity + f'; Date {current_day.date()} Stop Loss Sell signal generated for symbol {symbol} as price dropped to {current_price:.2f} which is {pct_change*100:.2f}% below buy price {buy_price:.2f}'
 
 
-    # Update cash and equity value at end of day
-    cash = cash + cash * annual_interest/trading_days
-    equity_value = cash + sum([ pos['num_shares'] * data[pos['symbol']].loc[current_day,'close'] for pos in positions.values() ])
-    cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity.strip('; ')}
-    current_day += timedelta(days=1)
+        # Update cash and equity value at end of day
+        cash = cash + cash * annual_interest/trading_days
+        equity_value = cash + sum([ pos['num_shares'] * data[pos['symbol']].loc[data[pos['symbol']].index.date <= current_day.date(), 'close'].iloc[-1] for pos in positions.values() ])
+        cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity.strip('; ')}
+        current_day += timedelta(days=1)
+        if current_day.month != current_month:
+            calculate_monthly_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+            current_month = current_day.month
+        if current_day.year != current_year:
+            calculate_annual_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+            current_year = current_day.year
+
+        pbar.update(1) 
 # exit all remaining positions at the end of backtest period
 day_activity = ''
 last_back_test_date = datetime(dates[-1].year,dates[-1].month,dates[-1].day)
@@ -400,12 +573,14 @@ for position_key, position_details in positions.items():
                                 'signal_processed': True,
                                 'signal_processed_message': f'Final sell executed for {num_shares} shares at price {sell_price}'
                                 }
+
+generate_back_test_performance_report(trades, cash_qeuality_history,initial_cash, start_back_test, end_back_test)
 cash_qeuality_history[last_back_test_date.date()] = {'cash': cash, 'equity': cash, 'activity': day_activity.strip('; ')}
 
 
 
-pd.DataFrame(all_signals).T.to_csv('all_signals.csv')
-pd.DataFrame(all_positions).T.to_csv('all_positions.csv')
-pd.DataFrame(trades).T.to_csv('trades.csv')
-pd.DataFrame(cash_qeuality_history).T.to_csv('cash_quality_history.csv')
-print(f'Final equity value: {equity_value}, Final cash value: {cash}')
+pd.DataFrame(all_signals).T.to_csv(TEMP/'all_signals.csv')
+pd.DataFrame(all_positions).T.to_csv(TEMP/'all_positions.csv')
+pd.DataFrame(trades).T.to_csv(TEMP/'trades.csv')
+pd.DataFrame(cash_qeuality_history).T.to_csv(TEMP/'cash_quality_history.csv')
+logging.info(f'Final equity value: {equity_value}, Final cash value: {cash}')

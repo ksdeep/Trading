@@ -268,10 +268,10 @@ if __name__ == "__main__":
     start_date = end_date - timedelta(days=365*20)  # Last 20 years 
 
 
-    # get_index_constituents()
-    # print("Index constituents updated.")
-    # load_data_from_zerodha(API_KEY, API_SECRET, end_date, start_date)
-    # print("Stock constituents updated.")
+    get_index_constituents()
+    print("Index constituents updated.")
+    load_data_from_zerodha(API_KEY, API_SECRET, end_date, start_date)
+    print("Stock constituents updated.")
     all_trading_dates = getAllTradingDates()
     trading_dates = all_trading_dates.loc[((all_trading_dates>=start_date.date()) & (all_trading_dates<=end_date.date()))]
     downloadPastBhavCopies(trading_dates)
