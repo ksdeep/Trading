@@ -156,16 +156,68 @@ def rank_candidate_signals(lv_pending_buy: dict,
     
     return lv_sorted_pending_buy_unique
         
-def calculate_monthly_performance(current_year: int, current_month: int,
+def calculate_monthly_performance(lv_back_test_start_date : datetime,
+                                  lv_initial_cash : float,
+                                  lv_current_year: int, lv_current_month: int,
                                   lv_trades: dict,
-                                    lv_cash_equity_history: dict,
-                                    lv_positions: dict):
+                                  lv_data : dict,
+                                  lv_cash_equity_history: dict,
+                                  lv_cash : float,
+                                  lv_positions: dict,
+                                  lv_all_dates : pd.Series,
+                                  lv_commsion : float) -> tuple:
     """
     Calculate and log the monthly performance of the backtest.
     """
     global logger
-    logger.info(f'Calculating monthly performance for {current_year}-{current_month:02d}')
-    None
+    logger.info(f'Calculating monthly performance for {lv_current_year}-{lv_current_month:02d}')
+    
+    lv_back_test_end_date = lv_all_dates[((lv_all_dates.apply(lambda x : x.year) == lv_current_year) & (lv_all_dates.apply(lambda x : x.month) == lv_current_month))].max()
+    lv_back_test_end_date =datetime(lv_back_test_end_date.year, lv_back_test_end_date.month, lv_back_test_end_date.day)
+
+    lv_trades = lv_trades.copy()
+    lv_cash_equity_history = lv_cash_equity_history.copy()
+    lv_positions = lv_positions.copy()
+    lv_cash = lv_cash.copy()
+    temp = math.ceil((lv_back_test_end_date - lv_back_test_start_date).days / 30)
+    if temp > 1:
+        lv_last_month_end_date = lv_back_test_end_date - pd.DateOffset(months=1)
+        starting_cash = lv_cash_equity_history[lv_last_month_end_date.date()]['equity']
+    else:
+        starting_cash = lv_initial_cash
+
+    # Calculate monthly performance metrics
+    day_activity = ''
+    for position_key, position_details in lv_positions.items():
+        sell_symbol = position_details['symbol']
+        buy_price = position_details['buy_price']
+        num_shares = position_details['num_shares']
+        sell_price = lv_data[sell_symbol].loc[ lv_data[sell_symbol].index <= lv_back_test_end_date,['close','open','high','low']].iloc[-1].mean()
+        position_value_at_exit = num_shares * sell_price * (1 - lv_commsion)
+        profit_loss_amount = position_value_at_exit - position_details['position_cost']
+        profit_loss_pct = profit_loss_amount / position_details['position_cost']
+        lv_cash = lv_cash + position_value_at_exit 
+        lv_trades[position_key]['position_value_at_exit'] = position_value_at_exit
+        lv_trades[position_key]['sell_date'] = lv_back_test_end_date.date()
+        lv_trades[position_key]['sell_price'] = sell_price 
+        lv_trades[position_key]['pct_change_in_price'] = (sell_price - buy_price) / buy_price
+        lv_trades[position_key]['profit_loss_amount'] = profit_loss_amount
+        lv_trades[position_key]['profit_loss_pct'] = profit_loss_pct
+        lv_trades[position_key]['number_of_days_held'] = (lv_back_test_end_date.date() - position_details['buy_date']).days
+        lv_trades[position_key]['trade_completed'] = True
+        lv_trades[position_key]['type_of_exit'] = 'END_OF_BACKTEST_SELL'
+        day_activity = day_activity + f'; Date {lv_back_test_end_date.date()} Final END OF BACK TEST Sell executed on symbol {sell_symbol} for {num_shares} shares at price {sell_price:.2f}, postion value at exit {position_value_at_exit:.2f}, total P/L: {profit_loss_amount:.2f} ({profit_loss_pct*100:.2f}%)'
+    
+    lv_cash_equity_history [lv_back_test_end_date.date()] = {'cash': lv_cash, 'equity': lv_cash, 'activity': day_activity.strip('; ')}
+
+    final_equity = lv_cash_equity_history [lv_back_test_end_date.date()]['equity']
+    monthly_return = (final_equity - starting_cash) / starting_cash if starting_cash !=0 else 0.0
+    return monthly_return, final_equity
+
+    #pd.DataFrame(lv_trades).T.to_csv(TEMP/f'trades_until_{lv_current_year}_{lv_current_month:02d}.csv')
+    #pd.DataFrame(lv_cash_equity_history).T.to_csv(TEMP/f'cash_equity_history_until_{lv_current_year}_{lv_current_month:02d}.csv')
+
+    
 def calculate_annual_performance(current_year: int, current_month: int,
                                   lv_trades: dict,
                                     lv_cash_equity_history: dict,
@@ -175,7 +227,50 @@ def calculate_annual_performance(current_year: int, current_month: int,
     """
     global logger
     logger.info(f'Calculating annual performance for {current_year}')
+
     None
+def close_all_positions_at_end_of_backtest(lv_back_test_end_date: datetime = None,
+                                           lv_positions: dict = None,
+                                           lv_data: dict = None,
+                                           lv_trades: dict = None,
+                                           lv_cash : float = None,
+                                           lv_all_signals : dict = None)-> tuple:
+    """
+    Close all open positions at the end of the backtest period.
+    """
+    global logger,commission
+    logger.info(f'Closing all open positions at the end of backtest period')
+
+    day_activity = ''
+     
+    for position_key, position_details in lv_positions.items():
+        sell_symbol = position_details['symbol']
+        buy_price = position_details['buy_price']
+        num_shares = position_details['num_shares']
+        sell_price = lv_data[sell_symbol].loc[lv_back_test_end_date,['close','open','high','low']].mean()
+        position_value_at_exit = num_shares * sell_price * (1 - commission)
+        profit_loss_amount = position_value_at_exit - position_details['position_cost']
+        profit_loss_pct = profit_loss_amount / position_details['position_cost']
+        lv_cash = lv_cash + position_value_at_exit    
+        lv_trades[position_key]['position_value_at_exit'] = position_value_at_exit
+        lv_trades[position_key]['sell_date'] = lv_back_test_end_date.date()
+        lv_trades[position_key]['sell_price'] = sell_price 
+        lv_trades[position_key]['pct_change_in_price'] = (sell_price - buy_price) / buy_price
+        lv_trades[position_key]['profit_loss_amount'] = profit_loss_amount
+        lv_trades[position_key]['profit_loss_pct'] = profit_loss_pct
+        lv_trades[position_key]['number_of_days_held'] = (lv_back_test_end_date.date() - position_details['buy_date']).days
+        lv_trades[position_key]['trade_completed'] = True
+        lv_trades[position_key]['type_of_exit'] = 'END_OF_BACKTEST_SELL'
+        day_activity = day_activity + f'; Date {lv_back_test_end_date.date()} Final END OF BACK TEST Sell executed on symbol {sell_symbol} for {num_shares} shares at price {sell_price:.2f}, postion value at exit {position_value_at_exit:.2f}, total P/L: {profit_loss_amount:.2f} ({profit_loss_pct*100:.2f}%)'
+        lv_all_signals[position_key] = {'symbol': sell_symbol,
+                                    'signal_date': lv_back_test_end_date.date(),
+                                    'signal_type': 'END_OF_BACKTEST_SELL',
+                                    'signal_processed': True,
+                                    'signal_processed_message': f'Final sell executed for {num_shares} shares at price {sell_price}'
+                                    }
+    lv_positions.clear()
+    return day_activity, lv_cash
+    
 def generate_back_test_performance_report(lv_trades: dict,
                                           lv_cash_equity_history: dict,
                                           lv_initial_cash: int,
@@ -309,12 +404,13 @@ pending_sell = {}
 all_signals = {}
 all_positions = {}
 data = {}
+mothnly_performance = {}
 
 
 
 symbols = ['RELIANCE', 'TCS', 'OIL', 'HDFCBANK', 'TITAN']
 start_back_test = datetime(2007, 1, 1)
-end_back_test = datetime(2024, 12, 31)
+end_back_test = datetime(2007, 3, 31)
 max_positions = 8
 capital_fraction = 0.10
 commission = 0.005
@@ -332,6 +428,8 @@ equity_value = initial_cash
 cash = initial_cash
 data_start_date = start_back_test - timedelta(365*2)
 
+mothnly_performance['Start Back Test'] = {'equity_value': initial_cash,
+                                          'change_in_equity_pct': 0.0}
 
 dates = set()
 for sym in symbols:
@@ -365,6 +463,7 @@ day_activity = ''
 current_month = current_day.month
 current_year = current_day.year
 
+
 with tqdm(total=(end_back_test - start_back_test).days) as pbar:
     while current_day <= end_back_test:
         if current_day.date() not in dates: # market not open no action. 
@@ -376,7 +475,19 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
             cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity}
             current_day += timedelta(days=1)
             if current_day.month != current_month:
-                calculate_monthly_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+                monthly_return_pct, end_month_euity = calculate_monthly_performance(lv_back_test_start_date=start_back_test,
+                                                                                    lv_initial_cash=initial_cash,
+                                                                                    lv_current_year=current_year, 
+                                                                                    lv_current_month=current_month,
+                                                                                    lv_trades=trades, 
+                                                                                    lv_cash_equity_history=cash_qeuality_history,
+                                                                                    lv_positions=positions,
+                                                                                    lv_cash=cash,
+                                                                                    lv_data=data,
+                                                                                    lv_all_dates=pd.Series(dates),
+                                                                                    lv_commsion=commission)
+                mothnly_performance[f'End of {current_year}-{current_month:02d}'] = {'equity_value': end_month_euity,
+                                                                                'change_in_equity_pct': monthly_return_pct}
                 current_month = current_day.month
             if current_day.year != current_year:
                 calculate_annual_performance(current_year, current_month, trades, cash_qeuality_history,positions)
@@ -538,7 +649,19 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
         cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity.strip('; ')}
         current_day += timedelta(days=1)
         if current_day.month != current_month:
-            calculate_monthly_performance(current_year, current_month, trades, cash_qeuality_history,positions)
+            monthly_return_pct, end_month_euity = calculate_monthly_performance(lv_back_test_start_date=start_back_test,
+                                                                                lv_initial_cash=initial_cash,
+                                                                                lv_current_year=current_year, 
+                                                                                lv_current_month=current_month,
+                                                                                lv_trades=trades, 
+                                                                                lv_cash_equity_history=cash_qeuality_history,
+                                                                                lv_positions=positions,
+                                                                                lv_cash=cash,
+                                                                                lv_data=data,
+                                                                                lv_all_dates=pd.Series(dates),
+                                                                                lv_commsion=commission)
+            mothnly_performance[f'End of {current_year}-{current_month:02d}'] = {'equity_value': end_month_euity,
+                                                                                'change_in_equity_pct': monthly_return_pct}
             current_month = current_day.month
         if current_day.year != current_year:
             calculate_annual_performance(current_year, current_month, trades, cash_qeuality_history,positions)
@@ -546,41 +669,24 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
 
         pbar.update(1) 
 # exit all remaining positions at the end of backtest period
-day_activity = ''
 last_back_test_date = datetime(dates[-1].year,dates[-1].month,dates[-1].day)
-for position_key, position_details in positions.items():
-    sell_symbol = position_details['symbol']
-    buy_price = position_details['buy_price']
-    num_shares = position_details['num_shares']
-    sell_price = data[sell_symbol].loc[last_back_test_date,['close','open','high','low']].mean()
-    position_value_at_exit = num_shares * sell_price * (1 - commission)
-    profit_loss_amount = position_value_at_exit - position_details['position_cost']
-    profit_loss_pct = profit_loss_amount / position_details['position_cost']
-    cash = cash + position_value_at_exit    
-    trades[position_key]['position_value_at_exit'] = position_value_at_exit
-    trades[position_key]['sell_date'] = last_back_test_date.date()
-    trades[position_key]['sell_price'] = sell_price 
-    trades[position_key]['pct_change_in_price'] = (sell_price - buy_price) / buy_price
-    trades[position_key]['profit_loss_amount'] = profit_loss_amount
-    trades[position_key]['profit_loss_pct'] = profit_loss_pct
-    trades[position_key]['number_of_days_held'] = (last_back_test_date.date() - position_details['buy_date']).days
-    trades[position_key]['trade_completed'] = True
-    trades[position_key]['type_of_exit'] = 'END_OF_BACKTEST_SELL'
-    day_activity = day_activity + f'; Date {last_back_test_date.date()} Final Sell executed on symbol {sell_symbol} for {num_shares} shares at price {sell_price:.2f}, postion value at exit {position_value_at_exit:.2f}, total P/L: {profit_loss_amount:.2f} ({profit_loss_pct*100:.2f}%)'
-    all_signals[position_key] = {'symbol': sell_symbol,
-                                'signal_date': last_back_test_date.date(),
-                                'signal_type': 'END_OF_BACKTEST_SELL',
-                                'signal_processed': True,
-                                'signal_processed_message': f'Final sell executed for {num_shares} shares at price {sell_price}'
-                                }
+
+day_activity,cash = close_all_positions_at_end_of_backtest(lv_back_test_end_date=last_back_test_date,
+                                                    lv_positions=positions,
+                                                    lv_data=data,
+                                                    lv_all_signals=all_signals,
+                                                    lv_trades=trades,
+                                                    lv_cash=cash)
+equity_value = cash
+cash_qeuality_history[last_back_test_date.date()] = {'cash': cash, 'equity': cash, 'activity': day_activity.strip('; ')}
+# the equity value at the end of backtest is equal to cash as all positions are closed. then only call the performance report generation function.
 
 generate_back_test_performance_report(trades, cash_qeuality_history,initial_cash, start_back_test, end_back_test)
-cash_qeuality_history[last_back_test_date.date()] = {'cash': cash, 'equity': cash, 'activity': day_activity.strip('; ')}
 
-
-
+# write all performance data to csv files for further analysis if needed.
 pd.DataFrame(all_signals).T.to_csv(TEMP/'all_signals.csv')
 pd.DataFrame(all_positions).T.to_csv(TEMP/'all_positions.csv')
 pd.DataFrame(trades).T.to_csv(TEMP/'trades.csv')
 pd.DataFrame(cash_qeuality_history).T.to_csv(TEMP/'cash_quality_history.csv')
+pd.DataFrame(mothnly_performance).T.to_csv(TEMP/'monthly_performance.csv')
 logging.info(f'Final equity value: {equity_value}, Final cash value: {cash}')
