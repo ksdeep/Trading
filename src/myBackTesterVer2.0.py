@@ -1,6 +1,10 @@
 from GetFreshMarketData import *
 import matplotlib.pyplot as plt
 import logging
+import pickle
+import backtest_dashboard 
+pd.set_option('future.no_silent_downcasting', True)
+
 
 logging.basicConfig(
     filename=TEMP/'backTester.log',
@@ -163,99 +167,6 @@ def rank_candidate_signals(lv_pending_buy: dict,
             seen.add(sym)
     
     return lv_sorted_pending_buy_unique
-        
-def calculate_monthly_performance(lv_initial_cash : float,
-                                  lv_current_year: int, 
-                                  lv_current_month: int,
-                                  lv_data : dict,
-                                  lv_cash_equity_history: dict,
-                                  lv_cash : float,
-                                  lv_positions: dict,
-                                  lv_all_dates : pd.Series,
-                                  lv_commsion : float) -> tuple:
-    """
-    Calculate and log the monthly performance of the backtest.
-    """
-    global logger
-    logger.info(f'Calculating monthly performance for {lv_current_year}-{lv_current_month:02d}')
-    
-    lv_back_test_end_date = lv_all_dates[((lv_all_dates.apply(lambda x : x.year) == lv_current_year) & (lv_all_dates.apply(lambda x : x.month) == lv_current_month))].max()
-    lv_back_test_end_date = get_last_day(int(lv_back_test_end_date.year), int(lv_back_test_end_date.month))
-    lv_last_day_of_previous_month = lv_back_test_end_date - pd.DateOffset(months=1) 
-    lv_last_day_of_previous_month = get_last_day(int(lv_last_day_of_previous_month.year), int(lv_last_day_of_previous_month.month))
-    
-
-    
-    lv_cash_equity_history = lv_cash_equity_history.copy()
-    lv_positions = lv_positions.copy()
-    lv_cash = lv_cash.copy()
-
-
-    
-    temp_df = pd.DataFrame(lv_cash_equity_history).T
-    temp =temp_df.loc[temp_df.index <= lv_last_day_of_previous_month.date(),'equity'] 
-    if temp.empty:
-        starting_cash = lv_initial_cash
-    else:
-        starting_cash = temp.iloc[-1]
-    
-    # Calculate monthly performance metrics
-    
-    for _, position_details in lv_positions.items():
-        sell_symbol = position_details['symbol']
-        num_shares = position_details['num_shares']
-        sell_price = lv_data[sell_symbol].loc[ lv_data[sell_symbol].index <= lv_back_test_end_date,['close','open','high','low']].iloc[-1].mean()
-        position_value_at_exit = num_shares * sell_price * (1 - lv_commsion)
-        lv_cash = lv_cash + position_value_at_exit 
-        
-    final_equity = lv_cash
-    monthly_return = (final_equity - starting_cash) / starting_cash if starting_cash !=0 else 0.0
-    return monthly_return, final_equity
-
-    
-    
-def calculate_annual_performance( lv_initial_cash : float,
-                                  lv_current_year: int,
-                                  lv_data : dict,
-                                  lv_cash_equity_history: dict,
-                                  lv_cash : float,
-                                  lv_positions: dict,
-                                  lv_all_dates : pd.Series,
-                                  lv_commsion : float) -> tuple:
-    """
-    Calculate and log the annual performance of the backtest.
-    """
-    global logger
-    logger.info(f'Calculating annual performance for {current_year}')
-
-    lv_back_test_end_date = lv_all_dates[(lv_all_dates.apply(lambda x : x.year) == lv_current_year) ].max()
-    lv_back_test_end_date = get_last_day(int(lv_back_test_end_date.year), int(lv_back_test_end_date.month))
-    lv_last_day_of_previous_year = lv_back_test_end_date - pd.DateOffset(years=1) 
-    lv_last_day_of_previous_year = get_last_day(int(lv_last_day_of_previous_year.year), int(lv_last_day_of_previous_year.month))
-
-    lv_cash_equity_history = lv_cash_equity_history.copy()
-    lv_positions = lv_positions.copy()
-    lv_cash = lv_cash.copy()
-
-
-    
-    temp_df = pd.DataFrame(lv_cash_equity_history).T
-    temp =temp_df.loc[temp_df.index <= lv_last_day_of_previous_year.date(),'equity'] 
-    if temp.empty:
-        starting_cash = lv_initial_cash
-    else:
-        starting_cash = temp.iloc[-1]
-
-    for _, position_details in lv_positions.items():
-        sell_symbol = position_details['symbol']
-        num_shares = position_details['num_shares']
-        sell_price = lv_data[sell_symbol].loc[ lv_data[sell_symbol].index <= lv_back_test_end_date,['close','open','high','low']].iloc[-1].mean()
-        position_value_at_exit = num_shares * sell_price * (1 - lv_commsion)
-        lv_cash = lv_cash + position_value_at_exit 
-    
-    final_equity = lv_cash
-    annual_return = (final_equity - starting_cash) / starting_cash if starting_cash !=0 else 0.0
-    return annual_return, final_equity
 
 def close_all_positions_at_end_of_backtest(lv_back_test_end_date: datetime = None,
                                            lv_positions: dict = None,
@@ -303,7 +214,7 @@ def generate_back_test_performance_report(lv_trades: dict,
                                           lv_cash_equity_history: dict,
                                           lv_initial_cash: int,
                                           lv_start_date: datetime,
-                                          lv_end_date: datetime):
+                                          lv_end_date: datetime)-> tuple:
     """
     Generate and log the overall performance report of the backtest.
     """
@@ -394,35 +305,217 @@ def generate_back_test_performance_report(lv_trades: dict,
     print(f"Avg Trade P/L:    {avg_profit_per_trade:.2f}")
 
     # --- 4. Plotting (Fixed for the TypeError) ---
-    plt.figure(figsize=(12, 10))
+    # plt.figure(figsize=(12, 10))
 
-    # Subplot 1: Equity Curve
-    plt.subplot(2, 1, 1)
-    plt.plot(equity_curve.index, equity_curve.values, label='Equity', color='blue')
-    plt.title('Equity Curve')
-    plt.ylabel('Capital')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    # # Subplot 1: Equity Curve
+    # plt.subplot(2, 1, 1)
+    # plt.plot(equity_curve.index, equity_curve.values, label='Equity', color='blue')
+    # plt.title('Equity Curve')
+    # plt.ylabel('Capital')
+    # plt.grid(True, alpha=0.3)
+    # plt.legend()
 
-    # Subplot 2: Drawdown Curve
-    plt.subplot(2, 1, 2)
-    # FIX: Use .index and .values explicitly to avoid type issues in fill_between
-    plt.plot(drawdown.index, drawdown.values, label='Drawdown', color='red')
-    # plt.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.3)
+    # # Subplot 2: Drawdown Curve
+    # plt.subplot(2, 1, 2)
+    # # FIX: Use .index and .values explicitly to avoid type issues in fill_between
+    # plt.plot(drawdown.index, drawdown.values, label='Drawdown', color='red')
+    # # plt.fill_between(drawdown.index, drawdown.values, 0, color='red', alpha=0.3)
     
-    plt.title('Drawdown Curve')
-    plt.ylabel('Drawdown %')
-    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    # plt.title('Drawdown Curve')
+    # plt.ylabel('Drawdown %')
+    # plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
+    # plt.grid(True, alpha=0.3)
+    # plt.legend()
 
-    plt.tight_layout()
-    plt.savefig('backtest_report.png')
-    plt.show()
+    # plt.tight_layout()
+    # plt.savefig('backtest_report.png')
+    # plt.show()
+    return equity_curve,drawdown
+
+def generate_monthly_and_yearly_performance(lv_eqity_cash_history : pd.DataFrame, lv_initial_equity_target:float):
+    lv_eqity_cash_history = lv_eqity_cash_history.copy()
+
+    lv_eqity_cash_history = lv_eqity_cash_history.set_index('date')
+
+    initial_actual = lv_eqity_cash_history['equity'].iloc[0]
+    scaling_factor = lv_initial_equity_target / initial_actual
+    lv_eqity_cash_history['equity_adj'] = lv_eqity_cash_history['equity'] * scaling_factor
+
+    monthly_equity = lv_eqity_cash_history['equity_adj'].resample('ME').last()
+
+    # 4. Calculate Monthly Return %
+    # The first month's return is calculated against the $100,000 starting point
+    monthly_returns = monthly_equity.pct_change().infer_objects(copy=False) 
+    monthly_returns.iloc[0] = (monthly_equity.iloc[0] / lv_initial_equity_target - 1) 
+
+    # 5. Prepare data for the Pivot Table
+    returns_df = monthly_returns.reset_index()
+    returns_df.columns = ['date', 'return_pct']
+    returns_df['Year'] = returns_df['date'].dt.year
+    returns_df['Month'] = returns_df['date'].dt.strftime('%b')
+
+    # Define month order for the columns
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    # 6. Pivot the data: Rows=Year, Columns=Month
+    performance_grid = returns_df.pivot(index='Year', columns='Month', values='return_pct')
+    performance_grid = performance_grid.reindex(columns=month_order)
+
+    # 7. Calculate Total Yearly Return %
+    yearly_equity = lv_eqity_cash_history['equity_adj'].resample('YE').last()
+    yearly_returns = yearly_equity.pct_change().infer_objects(copy=False) 
+    yearly_returns.iloc[0] = (yearly_equity.iloc[0] / lv_initial_equity_target - 1) 
+
+    performance_grid['Total Year %'] = yearly_returns.values
+
+    # 8. Output the result
+    return performance_grid
 
 
+def run_monte_carlo(lv_equity_curve, lv_initial_capital=100000, lv_num_simulations=1000)-> tuple:
+    
+    global logger
+    lv_equity_curve = lv_equity_curve.copy().reset_index()
+    lv_equity_curve.columns = ['date', 'equity']
+    lv_equity_curve = lv_equity_curve.set_index('date')                               
+    lv_equity_curve = lv_equity_curve.sort_index()
 
+    # Calculate Daily Returns
+    # We use daily returns instead of trade list shuffling to preserve
+    # the correlation between overlapping positions.
+    # print(lv_equity_curve.columns)
+    lv_equity_curve['daily_return'] = lv_equity_curve['equity'].pct_change().fillna(0)
+    daily_returns = lv_equity_curve['daily_return'].values
+    
+    n_days = len(daily_returns)
+    duration_years = n_days / 252  # Approximate trading days per year
+    
+    logger.info(f"Loaded {n_days} days of data. Starting {lv_num_simulations} simulations...")
 
+    # 2. Monte Carlo Simulation (Bootstrapping with Replacement)
+    results_cagr = []
+    results_max_dd = []
+    results_curves = []
+
+    np.random.seed(42)  # For reproducible results
+
+    for i in range(lv_num_simulations):
+        # Resample daily returns with replacement (Bootstrapping)
+        # This simulates "what if" market days happened in a different frequency/order
+        shuffled_returns = np.random.choice(daily_returns, size=n_days, replace=True)
+        
+        # Reconstruct Equity Curve
+        equity_curve = lv_initial_capital * np.cumprod(1 + shuffled_returns)
+        
+        # Calculate Metrics
+        final_equity = equity_curve[-1]
+        cagr = (final_equity / lv_initial_capital) ** (1 / duration_years) - 1
+        
+        # Max Drawdown
+        running_max = np.maximum.accumulate(equity_curve)
+        drawdown = (equity_curve - running_max) / running_max
+        max_dd = drawdown.min()
+        
+        results_cagr.append(cagr)
+        results_max_dd.append(max_dd)
+        
+        # Store first 100 curves for plotting to save memory
+        if i < 100:
+            results_curves.append(equity_curve)
+
+    # # 3. Plotting Results
+    # plt.figure(figsize=(14, 10))
+
+    # # Plot A: Equity Curves
+    # plt.subplot(2, 2, 1)
+    # for curve in results_curves:
+    #     plt.plot(curve, color='gray', alpha=0.1)
+    # plt.plot(np.mean(results_curves, axis=0), color='blue', linewidth=2, label='Average')
+    # plt.title(f'Simulated Equity Curves ({lv_num_simulations} Runs)')
+    # plt.ylabel('Equity')
+    # plt.grid(True, alpha=0.3)
+
+    # # Plot B: Max Drawdown Distribution
+    # plt.subplot(2, 2, 2)
+    # plt.hist(results_max_dd, bins=50, color='firebrick', alpha=0.7, edgecolor='black')
+    worst_5_pct_dd = np.percentile(results_max_dd, 5)
+    # plt.axvline(worst_5_pct_dd, color='black', linestyle='--', label=f'Worst 5%: {worst_5_pct_dd:.2%}')
+    # plt.title('Distribution of Max Drawdown')
+    # plt.legend()
+    # plt.grid(True, alpha=0.3)
+
+    # # Plot C: CAGR Distribution
+    # plt.subplot(2, 2, 3)
+    # plt.hist(results_cagr, bins=50, color='seagreen', alpha=0.7, edgecolor='black')
+    worst_5_pct_cagr = np.percentile(results_cagr, 5)
+    # plt.axvline(worst_5_pct_cagr, color='black', linestyle='--', label=f'Worst 5%: {worst_5_pct_cagr:.2%}')
+    # plt.title('Distribution of CAGR')
+    # plt.legend()
+    # plt.grid(True, alpha=0.3)
+
+    # # Plot D: Risk vs Reward Scatter
+    # plt.subplot(2, 2, 4)
+    # plt.scatter(results_max_dd, results_cagr, alpha=0.5, s=15, color='purple')
+    # plt.title('CAGR vs Max Drawdown')
+    # plt.xlabel('Max Drawdown')
+    # plt.ylabel('CAGR')
+    # plt.grid(True, alpha=0.3)
+
+    # plt.tight_layout()
+    # plt.show()
+
+    # 4. Print Statistics
+    print("-" * 30)
+    print("MONTE CARLO STATISTICS")
+    print("-" * 30)
+    print(f"Mean CAGR:          {np.mean(results_cagr):.2%}")
+    print(f"Median CAGR:        {np.median(results_cagr):.2%}")
+    print(f"Worst 5% CAGR:      {worst_5_pct_cagr:.2%}")
+    print("-" * 30)
+    print(f"Mean Max DD:        {np.mean(results_max_dd):.2%}")
+    print(f"Median Max DD:      {np.median(results_max_dd):.2%}")
+    print(f"Worst 5% Max DD:    {worst_5_pct_dd:.2%}")
+    print("-" * 30)
+
+    return results_curves,results_max_dd,results_cagr
+
+def prepare_monte_carlo_data(results_curves, results_max_dd, results_cagr):
+    """
+    Generate Monte Carlo simulation data from backtest results
+    Call this after run_monte_carlo() in your backtest
+    
+    Usage in myBackTesterVer2.0.py (after run_monte_carlo):
+    -------
+    results_curves, results_max_dd, results_cagr = run_monte_carlo(...)
+    from backtest_dashboard import prepare_monte_carlo_data
+    prepare_monte_carlo_data(results_curves, results_max_dd, results_cagr, TEMP)
+    """
+
+    # Sample curve to reduce file size // not sampling now. 
+    sampled_curves = results_curves
+
+    mc_data = {
+        'cagr_distribution': np.array(results_cagr).tolist(),
+        'max_dd_distribution': np.array(results_max_dd).tolist(),
+        'sample_curves': [[float(v) for v in curve] for curve in sampled_curves],
+        'stats': {
+            'mean_cagr': float(np.mean(results_cagr)),
+            'median_cagr': float(np.median(results_cagr)),
+            'std_cagr': float(np.std(results_cagr)),
+            'worst_5pct_cagr': float(np.percentile(results_cagr, 5)),
+            'best_95pct_cagr': float(np.percentile(results_cagr, 95)),
+            'mean_max_dd': float(np.mean(results_max_dd)),
+            'median_max_dd': float(np.median(results_max_dd)),
+            'std_max_dd': float(np.std(results_max_dd)),
+            'worst_5pct_dd': float(np.percentile(results_max_dd, 5)),
+            'best_95pct_dd': float(np.percentile(results_max_dd, 95)),
+        }
+    }
+
+    with open(TEMP / 'monte_carlo_results.pkl', 'wb') as f:
+        pickle.dump(mc_data, f)
+    
+    print("Monte Carlo data saved to monte_carlo_results.pkl")
 
 
 positions = {}      # symbol -> position dict
@@ -444,10 +537,9 @@ max_positions = 8
 capital_fraction = 0.10
 commission = 0.005
 annual_interest = 0.06
-trading_days = 365
+trading_days = 365.25
 stop_loss_pct = 0.10 # stop loss percentage
 which_days_to_trade = [0] # 0: Monday 6 : Sunday. list all days you would like to trade. 
-signal_strength_checked_on_trading_day = True # mark false if singal strength to be check during generationan and not during placing orders 
 position_szie_type = 4   # 1 - fixed based on initial cash and capital fraction, 2 - variable based on current equity and capital fraction, 3 - based on existing position size, 4 - volatility based position sizing using ATR.
 allow_multiple_position_for_same_stock = False # mark true if multiple entries allowed else false.
 
@@ -462,6 +554,7 @@ mothnly_performance['Start Back Test'] = {'equity_value': initial_cash,
 annual_performance['Start Back Test'] = {'equity_value': initial_cash,
                                           'change_in_equity_pct': 0.0}
 
+## Generate all helping data required for generating signals. 
 dates = set()
 for sym in symbols:
     df = pd.read_csv(STOCK_DIR / f"{sym}.csv", parse_dates=['date'])
@@ -486,13 +579,13 @@ for sym in symbols:
 dates =  pd.Series(list(dates)).sort_values().to_list()
 
 
-cash_qeuality_history = {}
-current_day = start_back_test
 # note - signal generation happens everyday but trade execution happens only on specified days of week. 
 # also the signals are generted frist and then exectuted on next trading day. signals are never executed on the same day.
+# on the day of execution of trades signals strength is checked. 
+
+cash_qeuality_history = {}
+current_day = start_back_test
 day_activity = ''
-current_month = current_day.month
-current_year = current_day.year
 
 
 with tqdm(total=(end_back_test - start_back_test).days) as pbar:
@@ -505,33 +598,9 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
             day_activity = 'Market closed - no action'
             cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity}
             current_day += timedelta(days=1)
-            if current_day.month != current_month:
-                monthly_return_pct, end_month_euity = calculate_monthly_performance(lv_initial_cash=initial_cash,
-                                                                                    lv_current_year=current_year, 
-                                                                                    lv_current_month=current_month,
-                                                                                    lv_cash_equity_history=cash_qeuality_history,
-                                                                                    lv_positions=positions,
-                                                                                    lv_cash=cash,
-                                                                                    lv_data=data,
-                                                                                    lv_all_dates=pd.Series(dates),
-                                                                                    lv_commsion=commission)
-                mothnly_performance[f'End of {current_year}-{current_month:02d}'] = {'equity_value': end_month_euity,
-                                                                                'change_in_equity_pct': monthly_return_pct}
-                current_month = current_day.month
-            if current_day.year != current_year:
-                annual_return_pct, annual_equity = calculate_annual_performance (lv_initial_cash=initial_cash,
-                                                                                lv_current_year=current_year, 
-                                                                                lv_cash_equity_history=cash_qeuality_history,
-                                                                                lv_positions=positions,
-                                                                                lv_cash=cash,
-                                                                                lv_data=data,
-                                                                                lv_all_dates=pd.Series(dates),
-                                                                                lv_commsion=commission)
-                annual_performance[f'End of {current_year}'] = {'equity_value': annual_equity,
-                                                                'change_in_equity_pct': annual_return_pct}
-                current_year = current_day.year
             pbar.update(1) 
             continue
+
         day_activity = ''
         # check if the current day is a trade execution day then execute the buy and sell signals. 
         if current_day.weekday() in which_days_to_trade and current_day != start_back_test :
@@ -640,7 +709,8 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
                     all_signals[key] = value
                 pending_buy.clear()                
         # for all days need to check and generate buy and sell signals.
-
+        # for new strategy change this block only
+        # STRATEGY SECTION START
         for sym, df in data.items():
             current_day_df = df.loc[df.index.date == current_day.date()]
             if current_day_df.empty:
@@ -679,39 +749,13 @@ with tqdm(total=(end_back_test - start_back_test).days) as pbar:
                                     'signal_processed_message': 'Generated due to stop loss'
                                     }
                 day_activity = day_activity + f'; Date {current_day.date()} Stop Loss Sell signal generated for symbol {symbol} as price dropped to {current_price:.2f} which is {pct_change*100:.2f}% below buy price {buy_price:.2f}'
-
+        # STRATEGY SECTION END. 
 
         # Update cash and equity value at end of day
         cash = cash + cash * annual_interest/trading_days
-        equity_value = cash + sum([ pos['num_shares'] * data[pos['symbol']].loc[data[pos['symbol']].index.date <= current_day.date(), 'close'].iloc[-1] for pos in positions.values() ])
+        equity_value = cash + sum([ pos['num_shares'] * data[pos['symbol']].loc[data[pos['symbol']].index.date <= current_day.date(), ['close','open','high','low']].iloc[-1].mean() for pos in positions.values() ])
         cash_qeuality_history[current_day.date()] = {'cash': cash, 'equity': equity_value, 'activity': day_activity.strip('; ')}
         current_day += timedelta(days=1)
-        if current_day.month != current_month:
-            monthly_return_pct, end_month_euity = calculate_monthly_performance(lv_initial_cash=initial_cash,
-                                                                                lv_current_year=current_year, 
-                                                                                lv_current_month=current_month,
-                                                                                lv_cash_equity_history=cash_qeuality_history,
-                                                                                lv_positions=positions,
-                                                                                lv_cash=cash,
-                                                                                lv_data=data,
-                                                                                lv_all_dates=pd.Series(dates),
-                                                                                lv_commsion=commission)
-            mothnly_performance[f'End of {current_year}-{current_month:02d}'] = {'equity_value': end_month_euity,
-                                                                                'change_in_equity_pct': monthly_return_pct}
-            current_month = current_day.month
-        if current_day.year != current_year:
-            annual_return_pct, annual_equity = calculate_annual_performance (lv_initial_cash=initial_cash,
-                                                                                lv_current_year=current_year, 
-                                                                                lv_cash_equity_history=cash_qeuality_history,
-                                                                                lv_positions=positions,
-                                                                                lv_cash=cash,
-                                                                                lv_data=data,
-                                                                                lv_all_dates=pd.Series(dates),
-                                                                                lv_commsion=commission)
-            annual_performance[f'End of {current_year}'] = {'equity_value': annual_equity,
-                                                                'change_in_equity_pct': annual_return_pct}
-            
-            current_year = current_day.year
 
         pbar.update(1) 
 # exit all remaining positions at the end of backtest period
@@ -727,13 +771,50 @@ equity_value = cash
 cash_qeuality_history[last_back_test_date.date()] = {'cash': cash, 'equity': cash, 'activity': day_activity.strip('; ')}
 # the equity value at the end of backtest is equal to cash as all positions are closed. then only call the performance report generation function.
 
-generate_back_test_performance_report(trades, cash_qeuality_history,initial_cash, start_back_test, end_back_test)
+equity_curve,drawdown = generate_back_test_performance_report(trades, cash_qeuality_history,initial_cash, start_back_test, end_back_test)
+
+results_curves,results_max_dd,results_cagr = run_monte_carlo(lv_equity_curve=equity_curve,lv_initial_capital=initial_cash,lv_num_simulations=1000)
+
+prepare_monte_carlo_data(results_curves,results_max_dd,results_cagr)
 
 # write all performance data to csv files for further analysis if needed.
-pd.DataFrame(all_signals).T.to_csv(TEMP/'all_signals.csv')
-pd.DataFrame(all_positions).T.to_csv(TEMP/'all_positions.csv')
-pd.DataFrame(trades).T.to_csv(TEMP/'trades.csv')
-pd.DataFrame(cash_qeuality_history).T.to_csv(TEMP/'cash_quality_history.csv')
-pd.DataFrame(mothnly_performance).T.to_csv(TEMP/'monthly_performance.csv')
-pd.DataFrame(annual_performance).T.to_csv(TEMP/'annual_performance.csv')
+all_signals = pd.DataFrame(all_signals).T
+all_signals = all_signals.reset_index()
+all_signals = all_signals.rename(columns={'index':'key'})
+all_signals.to_csv(TEMP/'all_signals.csv')
+all_positions = pd.DataFrame(all_positions).T
+all_positions = all_positions.reset_index()
+all_positions = all_positions.rename(columns={'index':'key'})
+all_positions.to_csv(TEMP/'all_positions.csv')
+trades = pd.DataFrame(trades).T
+trades = trades.reset_index()
+trades = trades.rename(columns={'index':'key'})
+trades.to_csv(TEMP/'trades.csv')
+cash_qeuality_history = pd.DataFrame(cash_qeuality_history).T
+
+cash_qeuality_history = cash_qeuality_history.reset_index()
+cash_qeuality_history = cash_qeuality_history.rename(columns={'index':'date'})
+cash_qeuality_history['date'] = pd.to_datetime(cash_qeuality_history['date'])
+cash_qeuality_history.to_csv(TEMP/'cash_quality_history.csv')
+
+performance_grid = generate_monthly_and_yearly_performance(lv_eqity_cash_history=cash_qeuality_history,
+                                                           lv_initial_equity_target=initial_cash)
+performance_grid.to_csv(TEMP/'performance_grid.csv')
+
+equity_curve = equity_curve.reset_index()
+equity_curve = equity_curve.rename(columns = {'index':'date'})
+equity_curve.date = pd.to_datetime(equity_curve.date)
+
+drawdown = drawdown.reset_index()
+drawdown = drawdown.rename(columns = {'index':'date'})
+drawdown.date = pd.to_datetime(drawdown.date)
+
+equity_curve.to_csv(TEMP/'equity_curve.csv')
+drawdown.to_csv(TEMP/'drawdown.csv')
+
 logging.info(f'Final equity value: {equity_value}, Final cash value: {cash}')
+
+
+backtest_dashboard.display_results()
+
+

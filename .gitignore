@@ -3,3 +3,4 @@
 *.log
 *.pyc
 *.png
+Data/temp/monte_carlo_results.pkl
