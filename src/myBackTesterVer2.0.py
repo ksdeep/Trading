@@ -782,16 +782,18 @@ all_signals = pd.DataFrame(all_signals).T
 all_signals = all_signals.reset_index()
 all_signals = all_signals.rename(columns={'index':'key'})
 all_signals.to_csv(TEMP/'all_signals.csv')
+
 all_positions = pd.DataFrame(all_positions).T
 all_positions = all_positions.reset_index()
 all_positions = all_positions.rename(columns={'index':'key'})
 all_positions.to_csv(TEMP/'all_positions.csv')
+
 trades = pd.DataFrame(trades).T
 trades = trades.reset_index()
 trades = trades.rename(columns={'index':'key'})
 trades.to_csv(TEMP/'trades.csv')
-cash_qeuality_history = pd.DataFrame(cash_qeuality_history).T
 
+cash_qeuality_history = pd.DataFrame(cash_qeuality_history).T
 cash_qeuality_history = cash_qeuality_history.reset_index()
 cash_qeuality_history = cash_qeuality_history.rename(columns={'index':'date'})
 cash_qeuality_history['date'] = pd.to_datetime(cash_qeuality_history['date'])
@@ -804,12 +806,11 @@ performance_grid.to_csv(TEMP/'performance_grid.csv')
 equity_curve = equity_curve.reset_index()
 equity_curve = equity_curve.rename(columns = {'index':'date'})
 equity_curve.date = pd.to_datetime(equity_curve.date)
+equity_curve.to_csv(TEMP/'equity_curve.csv')
 
 drawdown = drawdown.reset_index()
 drawdown = drawdown.rename(columns = {'index':'date'})
 drawdown.date = pd.to_datetime(drawdown.date)
-
-equity_curve.to_csv(TEMP/'equity_curve.csv')
 drawdown.to_csv(TEMP/'drawdown.csv')
 
 logging.info(f'Final equity value: {equity_value}, Final cash value: {cash}')
