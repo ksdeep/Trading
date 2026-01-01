@@ -26,6 +26,7 @@ app = Flask(__name__)
 MC_FILE = TEMP/"monte_carlo_results.pkl"
 # TEMP = Path("./outputs")
 
+# ==================== HELPER FUNCTIONS ====================
 
 def load_pickle_data():
     """Load Monte Carlo pickle file with detailed error reporting"""
@@ -36,7 +37,6 @@ def load_pickle_data():
         print(f"✅ MC File loaded: {MC_FILE}")
         print(f"   Keys: {list(data.keys())}")
         
-        # Check what we have
         if 'cagr_distribution' in data:
             ca = np.array(data['cagr_distribution'])
             print(f"   cagr_distribution: {len(ca)} items, range=[{ca.min():.4f}, {ca.max():.4f}]")
@@ -69,12 +69,11 @@ def load_csv(filename):
         return None
 
 def extract_final_equity_from_curves(sample_curves):
-    """V4.4 FIX: Extract final equity values from equity curves"""
+    """Extract final equity values from equity curves"""
     try:
         final_equity_list = []
         for curve in sample_curves:
             if len(curve) > 0:
-                # Last value in each curve is the final equity
                 final_equity_list.append(curve[-1])
         return final_equity_list
     except Exception as e:
@@ -97,46 +96,35 @@ def get_metrics():
         if equity is None or equity.empty:
             return jsonify({"error": "No equity curve data"}), 404
         
-        # Structure: [index], date, equity
-        # Drop the index column if present
         if equity.columns[0] in ['', 'Unnamed: 0', 'index']:
             equity = equity.iloc[:, 1:]
         
-        # Now equity has: date, equity
         date_col = 'date'
         equity_col = 'equity'
         
-        # Ensure columns exist
         if date_col not in equity.columns or equity_col not in equity.columns:
             return jsonify({"error": f"Missing columns. Found: {equity.columns.tolist()}"}), 404
         
-        # Convert date to datetime
         equity[date_col] = pd.to_datetime(equity[date_col])
         equity = equity.sort_values(date_col).reset_index(drop=True)
         
-        # Basic stats
         start_date = equity[date_col].iloc[0]
         end_date = equity[date_col].iloc[-1]
         initial_capital = equity[equity_col].iloc[0]
         final_equity = equity[equity_col].iloc[-1]
         
-        # Duration in years
         days = (end_date - start_date).days
         years = days / 365.25
         
-        # CAGR
         cagr = ((final_equity / initial_capital) ** (1/years) - 1) * 100 if years > 0 else 0
         
-        # Max Drawdown Percentage
         running_max = equity[equity_col].expanding().max()
         drawdown_pct = (equity[equity_col] - running_max) / running_max * 100
         max_dd_pct = drawdown_pct.min()
         
-        # Max Drawdown Duration (in days)
         max_dd_idx = drawdown_pct.idxmin()
         running_max_at_dd = running_max.iloc[max_dd_idx]
         
-        # Find recovery point
         recovery_idx = len(equity) - 1
         for i in range(max_dd_idx + 1, len(equity)):
             if equity[equity_col].iloc[i] >= running_max_at_dd:
@@ -145,7 +133,6 @@ def get_metrics():
         
         max_dd_duration = (equity[date_col].iloc[recovery_idx] - equity[date_col].iloc[max_dd_idx]).days
         
-        # Trade statistics
         num_trades = len(trades) if trades is not None and not trades.empty else 0
         win_rate = 0.0
         avg_trade_pnl = 0.0
@@ -156,29 +143,23 @@ def get_metrics():
         if num_trades > 0 and trades is not None:
             trades = trades.dropna(subset=['profit_loss_amount'])
             if len(trades) > 0:
-                # Win rate
                 winning_trades = len(trades[trades['profit_loss_amount'] > 0])
                 win_rate = (winning_trades / len(trades)) * 100
                 
-                # Average trade PnL
                 avg_trade_pnl = trades['profit_loss_amount'].mean()
                 
-                # CAR/MDD ratio
                 car_over_mdd = cagr / abs(max_dd_pct) if max_dd_pct != 0 else 0
                 
-                # Sharpe Ratio (annualized)
                 returns = equity[equity_col].pct_change().dropna()
                 if len(returns) > 0 and returns.std() > 0:
                     sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
                 
-                # Sortino Ratio (annualized, only negative returns)
                 downside_returns = returns[returns < 0]
                 if len(downside_returns) > 0:
                     downside_std = downside_returns.std()
                     if downside_std > 0:
                         sortino = (returns.mean() / downside_std) * np.sqrt(252)
         
-        # Format metrics in CORRECT ORDER
         metrics = {
             'backtest_start_date': start_date.strftime('%Y-%m-%d'),
             'backtest_end_date': end_date.strftime('%Y-%m-%d'),
@@ -212,7 +193,6 @@ def get_equity_curve():
         if equity is None or equity.empty:
             return jsonify({"dates": [], "values": []}), 200
         
-        # Drop index column
         if equity.columns[0] in ['', 'Unnamed: 0', 'index']:
             equity = equity.iloc[:, 1:]
         
@@ -239,7 +219,6 @@ def get_drawdown():
         if equity is None or equity.empty:
             return jsonify({"dates": [], "values": []}), 200
         
-        # Drop index column
         if equity.columns[0] in ['', 'Unnamed: 0', 'index']:
             equity = equity.iloc[:, 1:]
         
@@ -249,7 +228,6 @@ def get_drawdown():
         equity[date_col] = pd.to_datetime(equity[date_col])
         equity = equity.sort_values(date_col)
         
-        # Calculate drawdown from equity curve
         running_max = equity[equity_col].expanding().max()
         drawdown = (equity[equity_col] - running_max) / running_max * 100
         
@@ -263,14 +241,13 @@ def get_drawdown():
 
 @app.route('/api/trade-analysis')
 def get_trade_analysis():
-    """Trade P/L distribution histogram"""
+    """Trade P/L distribution histogram with trade count labels"""
     try:
         trades = load_csv('trades.csv')
         
         if trades is None or len(trades) == 0:
             return jsonify({"bins": [], "counts": []}), 200
         
-        # Get profit_loss_amount column
         if 'profit_loss_amount' not in trades.columns:
             return jsonify({"bins": [], "counts": []}), 200
         
@@ -279,7 +256,6 @@ def get_trade_analysis():
         if len(pnl) == 0:
             return jsonify({"bins": [], "counts": []}), 200
         
-        # Create histogram
         counts, edges = np.histogram(pnl, bins=20)
         bin_centers = [(edges[i] + edges[i+1])/2 for i in range(len(edges)-1)]
         
@@ -303,7 +279,6 @@ def get_symbol_stats():
         if 'symbol' not in trades.columns or 'profit_loss_amount' not in trades.columns:
             return jsonify([]), 200
         
-        # Group by symbol
         symbol_groups = trades.groupby('symbol').agg({
             'profit_loss_amount': ['sum', 'count', 'mean']
         }).round(2)
@@ -314,7 +289,6 @@ def get_symbol_stats():
             count = int(symbol_groups.loc[symbol, ('profit_loss_amount', 'count')])
             mean_pnl = symbol_groups.loc[symbol, ('profit_loss_amount', 'mean')]
             
-            # Calculate win rate for this symbol
             symbol_trades = trades[trades['symbol'] == symbol]
             wins = len(symbol_trades[symbol_trades['profit_loss_amount'] > 0])
             wr = (wins / count * 100) if count > 0 else 0
@@ -332,11 +306,49 @@ def get_symbol_stats():
         print(f"Error in symbol-stats: {e}")
         return jsonify([]), 200
 
+@app.route('/api/performance-grid')
+def get_performance_grid():
+    """Load performance grid from CSV"""
+    try:
+        perf = load_csv('performance_grid.csv')
+        
+        if perf is None or perf.empty:
+            return jsonify([]), 200
+        
+        result = []
+        for idx, row in perf.iterrows():
+            year_data = {
+                'year': str(int(row['Year'])) if 'Year' in row else str(idx)
+            }
+            
+            months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            for month in months:
+                if month in row:
+                    value = float(row[month])
+                    year_data[month] = {
+                        'value': f"{value*100:.2f}%",
+                        'color': 'positive' if value >= 0 else 'negative'
+                    }
+            
+            if 'Total Year %' in row:
+                value = float(row['Total Year %'])
+                year_data['total'] = {
+                    'value': f"{value*100:.2f}%",
+                    'color': 'positive' if value >= 0 else 'negative'
+                }
+            
+            result.append(year_data)
+        
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error in performance-grid: {e}")
+        return jsonify([]), 200
+
 # ==================== MONTE CARLO ROUTES ====================
 
 @app.route('/api/mc-summary')
 def get_mc_summary():
-    """Monte Carlo summary metrics in CORRECT ORDER"""
+    """Monte Carlo summary metrics"""
     try:
         mc_data = load_pickle_data()
         
@@ -349,15 +361,12 @@ def get_mc_summary():
         if len(cagr_list) == 0 or len(max_dd_list) == 0:
             return jsonify({"error": "Empty MC data"}), 404
         
-        # Convert to percentages if needed (check the actual range)
-        if cagr_list.max() < 1:  # Values like 0.10 (10%)
+        if cagr_list.max() < 1:
             cagr_list = cagr_list * 100
         
-        # For max_dd: values are negative like -0.20 or -20 depending on format
-        if abs(max_dd_list.max()) < 1:  # Values like -0.20 (-20%)
+        if abs(max_dd_list.max()) < 1:
             max_dd_list = max_dd_list * 100
         
-        # ORDER: mean_cagr, median_cagr, worst_5_cagr, mean_max_dd, median_max_dd, worst_5_max_dd
         summary = {
             'mean_cagr': f"{cagr_list.mean():.2f}%",
             'median_cagr': f"{np.median(cagr_list):.2f}%",
@@ -375,7 +384,7 @@ def get_mc_summary():
 
 @app.route('/api/mc-percentiles')
 def get_mc_percentiles():
-    """V4.4: Extract final_equity from sample_curves last values"""
+    """Extract final_equity from sample_curves last values"""
     try:
         mc_data = load_pickle_data()
         
@@ -383,15 +392,12 @@ def get_mc_percentiles():
             print("❌ MC data is None")
             return jsonify([]), 404
         
-        # Extract arrays
         cagr_list = mc_data.get('cagr_distribution')
         max_dd_list = mc_data.get('max_dd_distribution')
         sample_curves = mc_data.get('sample_curves')
         
-        # V4.4 FIX: Extract final_equity from sample_curves
         final_equity_list = extract_final_equity_from_curves(sample_curves) if sample_curves else []
         
-        # Debug logging
         print(f"\n🔍 DEBUG: Percentile Analysis")
         print(f"   final_equity_list (from curves): len={len(final_equity_list)}")
         print(f"   cagr_list type: {type(cagr_list)}, len={len(cagr_list) if cagr_list is not None else 'None'}")
@@ -399,12 +405,8 @@ def get_mc_percentiles():
         
         if len(final_equity_list) == 0 or cagr_list is None or max_dd_list is None:
             print("❌ Missing required data for percentile analysis")
-            print(f"   final_equity count: {len(final_equity_list)}")
-            print(f"   cagr_list: {cagr_list is not None}")
-            print(f"   max_dd_list: {max_dd_list is not None}")
             return jsonify([]), 404
         
-        # Convert to numpy arrays
         final_equity_list = np.array(final_equity_list)
         cagr_list = np.array(cagr_list)
         max_dd_list = np.array(max_dd_list)
@@ -413,12 +415,11 @@ def get_mc_percentiles():
         print(f"   cagr range: [{cagr_list.min():.4f}, {cagr_list.max():.4f}]")
         print(f"   max_dd range: [{max_dd_list.min():.4f}, {max_dd_list.max():.4f}]")
         
-        # Convert to percentages if needed
-        if cagr_list.max() < 1 and cagr_list.max() > 0:  # e.g., 0.10 means 10%
+        if cagr_list.max() < 1 and cagr_list.max() > 0:
             print("   Converting CAGR from decimal to percentage")
             cagr_list = cagr_list * 100
         
-        if abs(max_dd_list.max()) < 1:  # e.g., -0.20 means -20%
+        if abs(max_dd_list.max()) < 1:
             print("   Converting Max DD from decimal to percentage")
             max_dd_list = max_dd_list * 100
         
@@ -537,7 +538,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backtest Dashboard with Monte Carlo - V4.4</title>
+    <title>Backtest Dashboard with Monte Carlo - V4.5</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -646,11 +647,28 @@ HTML_TEMPLATE = """
         
         table th, table td {
             padding: 12px;
-            text-align: left;
+            text-align: center;
             border-bottom: 1px solid #ddd;
+            font-size: 0.9em;
+        }
+        
+        table th:first-child, table td:first-child {
+            text-align: left;
         }
         
         table tbody tr:hover { background: #f5f5f5; }
+        
+        .cell-positive {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: 500;
+        }
+        
+        .cell-negative {
+            background-color: #f8d7da;
+            color: #721c24;
+            font-weight: 500;
+        }
         
         .loading {
             text-align: center;
@@ -666,7 +684,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="header">
         <h1>🎲 Backtest Dashboard with Monte Carlo</h1>
-        <p>V4.4</p>
+        <p>V4.5 - Enhanced with Performance Grid & Trade Distribution Labels</p>
     </div>
     
     <div class="container">
@@ -693,6 +711,33 @@ HTML_TEMPLATE = """
             </div>
         </div>
         
+        <!-- MONTHLY & ANNUAL PERFORMANCE TABLE -->
+        <div class="table-container">
+            <div class="chart-title">📅 Monthly & Annual Performance</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Jan</th>
+                        <th>Feb</th>
+                        <th>Mar</th>
+                        <th>Apr</th>
+                        <th>May</th>
+                        <th>Jun</th>
+                        <th>Jul</th>
+                        <th>Aug</th>
+                        <th>Sep</th>
+                        <th>Oct</th>
+                        <th>Nov</th>
+                        <th>Dec</th>
+                        <th>Annual</th>
+                    </tr>
+                </thead>
+                <tbody id="performance-grid"></tbody>
+            </table>
+        </div>
+        
+        <!-- SYMBOL PERFORMANCE TABLE -->
         <div class="table-container">
             <div class="chart-title">Symbol Performance</div>
             <table>
@@ -851,24 +896,95 @@ HTML_TEMPLATE = """
                     if (!data.bins || data.bins.length === 0) return;
                     const ctx = document.getElementById('trade-distribution-chart');
                     if (charts['trades']) charts['trades'].destroy();
+                    
+                    const labels = data.bins.map(b => b.toFixed(0));
+                    const counts = data.counts;
+                    
                     charts['trades'] = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: data.bins.map(b => b.toFixed(0)),
+                            labels: labels,
                             datasets: [{
                                 label: 'Trade Count',
-                                data: data.counts,
+                                data: counts,
                                 backgroundColor: '#f39c12'
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: true,
-                            plugins: { legend: { display: false } }
-                        }
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        },
+                        plugins: [{
+                            id: 'tradeCountLabels',
+                            afterDatasetsDraw(chart) {
+                                const { ctx } = chart;
+                                chart.data.datasets.forEach((datasetMeta, i) => {
+                                    const meta = chart.getDatasetMeta(i);
+                                    meta.data.forEach((bar, index) => {
+                                        const x = bar.x;
+                                        const y = bar.y;
+                                        const count = counts[index];
+                                        
+                                        // Draw vertical text inside bar
+                                        ctx.save();
+                                        ctx.font = 'bold 10px Arial';
+                                        ctx.fillStyle = '#000';
+                                        ctx.textAlign = 'center';
+                                        ctx.textBaseline = 'middle';
+                                        
+                                        // Rotate 90 degrees for vertical text
+                                        ctx.translate(x, y - 10);
+                                        ctx.rotate(-Math.PI / 2);
+                                        ctx.fillText(`${count}`, 0, 0);
+                                        ctx.restore();
+                                    });
+                                });
+                            }
+                        }]
                     });
                 })
-                .catch(e => console.error('Error loading trades:', e));
+                .catch(e => console.error('Error:', e));
+        }
+        
+        function loadPerformanceGrid() {
+            fetch('/api/performance-grid')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if (Array.isArray(data) && data.length > 0) {
+                        data.forEach(yearData => {
+                            html += '<tr>';
+                            html += `<td><strong>${yearData.year}</strong></td>`;
+                            
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            months.forEach(month => {
+                                if (yearData[month]) {
+                                    const cellClass = yearData[month].color === 'positive' ? 'cell-positive' : 'cell-negative';
+                                    html += `<td class="${cellClass}">${yearData[month].value}</td>`;
+                                } else {
+                                    html += '<td>-</td>';
+                                }
+                            });
+                            
+                            if (yearData.total) {
+                                const cellClass = yearData.total.color === 'positive' ? 'cell-positive' : 'cell-negative';
+                                html += `<td class="${cellClass}"><strong>${yearData.total.value}</strong></td>`;
+                            } else {
+                                html += '<td>-</td>';
+                            }
+                            
+                            html += '</tr>';
+                        });
+                    }
+                    document.getElementById('performance-grid').innerHTML = html || '<tr><td colspan="14" style="text-align:center;">No data</td></tr>';
+                })
+                .catch(e => console.error('Error:', e));
         }
         
         function loadSymbolStats() {
@@ -1029,6 +1145,7 @@ HTML_TEMPLATE = """
             loadEquityCurve();
             loadDrawdown();
             loadTradeAnalysis();
+            loadPerformanceGrid();
             loadSymbolStats();
             loadMCMetrics();
             loadMCPercentiles();
@@ -1046,7 +1163,6 @@ HTML_TEMPLATE = """
 """
 
 # ==================== RUN ====================
-
 def open_browser(port=5000):
     """Open browser after server starts"""
     time.sleep(2)

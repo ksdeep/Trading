@@ -116,11 +116,11 @@ def get_position_for_symbol(lv_symbol : str, lv_equity : float,
             return get_position_for_symbol(lv_symbol, lv_equity, lv_initial_cash, 
                                            lv_current_cash, lv_df_ohlc, lv_capital_fraction, 
                                            lf_dt_current_day, 1, lv_existing_positions, lv_reason='No ATR data found so switching to fixed position sizing.')
-        elif lv_atr_value < 0.1:
+        elif lv_atr_value < 0.1 or np.isnan(lv_atr_value):
             return get_position_for_symbol(lv_symbol, lv_equity, lv_initial_cash, 
                                            lv_current_cash, lv_df_ohlc, lv_capital_fraction, 
                                            lf_dt_current_day, 1, lv_existing_positions, 
-                                           lv_reason=f'ATR is <0.1 for {lv_symbol} on {lf_dt_current_day} so switching to fixed position sizing.')   
+                                           lv_reason=f'ATR is <0.1 or NAN for {lv_symbol} on {lf_dt_current_day} so switching to fixed position sizing.')   
         else:
             lv_num_shares = math.floor((lv_equity * lv_capital_fraction) / (lv_atr_value * lv_atr_factor))
             lv_reason = f'Volatility based position sizing using ATR value {lv_atr_value} and factor {lv_atr_factor}' +  lv_reason
@@ -530,20 +530,20 @@ annual_performance = {}
 
 
 
-symbols = ['RELIANCE', 'TCS', 'OIL', 'HDFCBANK', 'TITAN']
+symbols = ['ADANIENT',	'ADANIPORTS',	'APOLLOHOSP',	'ASIANPAINT',	'AXISBANK',	'BAJAJ-AUTO',	'BAJFINANCE',	'BAJAJFINSV',	'BEL',	'BHARTIARTL',	'CIPLA',	'COALINDIA',	'DRREDDY',		'EICHERMOT',	'ETERNAL',	'GRASIM',	'HCLTECH',	'HDFCBANK',	'HDFCLIFE',	'HINDALCO',	'HINDUNILVR',	'ICICIBANK',	'ITC',	'INFY',	'INDIGO',	'JSWSTEEL',	'JIOFIN',	'KOTAKBANK',	'LT',	'M&M',	'MARUTI',	'MAXHEALTH',	'NTPC',	'NESTLEIND',	'ONGC',	'POWERGRID',	'RELIANCE',	'SBILIFE',	'SHRIRAMFIN',	'SBIN',	'SUNPHARMA',	'TCS',	'TATACONSUM',	'TMPV',	'TATASTEEL',	'TECHM',	'TITAN',	'TRENT',	'ULTRACEMCO',	'WIPRO']
 start_back_test = datetime(2007, 1, 1)
-end_back_test = datetime(2017, 12, 31)
-max_positions = 8
+end_back_test = datetime(2024, 12, 31)
+max_positions = 20
 capital_fraction = 0.10
 commission = 0.005
 annual_interest = 0.06
 trading_days = 365.25
 stop_loss_pct = 0.10 # stop loss percentage
 which_days_to_trade = [0] # 0: Monday 6 : Sunday. list all days you would like to trade. 
-position_szie_type = 4   # 1 - fixed based on initial cash and capital fraction, 2 - variable based on current equity and capital fraction, 3 - based on existing position size, 4 - volatility based position sizing using ATR.
+position_szie_type = 1   # 1 - fixed based on initial cash and capital fraction, 2 - variable based on current equity and capital fraction, 3 - based on existing position size, 4 - volatility based position sizing using ATR.
 allow_multiple_position_for_same_stock = False # mark true if multiple entries allowed else false.
 
-initial_cash = 100000
+initial_cash = 1000000
 equity_value = initial_cash
 
 cash = initial_cash
