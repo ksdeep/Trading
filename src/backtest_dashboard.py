@@ -80,6 +80,110 @@ def extract_final_equity_from_curves(sample_curves):
         print(f"❌ Error extracting final equity: {e}")
         return []
 
+def calculate_longest_winning_streak(trades_df):
+    """Calculate longest consecutive winning trades"""
+    try:
+        if trades_df is None or len(trades_df) == 0:
+            return 0
+        
+        trades_df = trades_df.dropna(subset=['profit_loss_amount'])
+        if len(trades_df) == 0:
+            return 0
+        
+        # Create binary series: 1 for winning, 0 for losing
+        is_winner = (trades_df['profit_loss_amount'] > 0).astype(int)
+        
+        # Calculate consecutive wins
+        max_streak = 0
+        current_streak = 0
+        
+        for value in is_winner.values:
+            if value == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 0
+        
+        return max_streak
+    except Exception as e:
+        print(f"❌ Error calculating winning streak: {e}")
+        return 0
+
+def calculate_longest_losing_streak(trades_df):
+    """Calculate longest consecutive losing trades"""
+    try:
+        if trades_df is None or len(trades_df) == 0:
+            return 0
+        
+        trades_df = trades_df.dropna(subset=['profit_loss_amount'])
+        if len(trades_df) == 0:
+            return 0
+        
+        # Create binary series: 1 for losing, 0 for winning
+        is_loser = (trades_df['profit_loss_amount'] < 0).astype(int)
+        
+        # Calculate consecutive losses
+        max_streak = 0
+        current_streak = 0
+        
+        for value in is_loser.values:
+            if value == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 0
+        
+        return max_streak
+    except Exception as e:
+        print(f"❌ Error calculating losing streak: {e}")
+        return 0
+
+def calculate_expectancy_multiple(trades_df):
+    """
+    Calculate expectancy multiple
+    Formula:
+    average_profit = (total_profit - total_loss) / number_of_trades
+    average_loss = sum_of_all_losses / number_of_losing_trades
+    expectancy = average_profit / abs(average_loss)
+    """
+    try:
+        if trades_df is None or len(trades_df) == 0:
+            return 0.0
+        
+        trades_df = trades_df.dropna(subset=['profit_loss_amount'])
+        if len(trades_df) == 0:
+            return 0.0
+        
+        pnl = trades_df['profit_loss_amount']
+        
+        # Total profit and total loss
+        total_profit = pnl[pnl > 0].sum()
+        total_loss = pnl[pnl < 0].sum()
+        num_trades = len(pnl)
+        
+        # Average profit per trade
+        average_profit = (total_profit - abs(total_loss)) / num_trades if num_trades > 0 else 0
+        
+        # Number of losing trades and average loss
+        losing_trades = pnl[pnl < 0]
+        num_losing_trades = len(losing_trades)
+        
+        if num_losing_trades == 0:
+            return 0.0
+        
+        average_loss = total_loss / num_losing_trades
+        
+        # Expectancy = average profit / abs(average loss)
+        if average_loss == 0:
+            return 0.0
+        
+        expectancy = average_profit / abs(average_loss)
+        
+        return expectancy
+    except Exception as e:
+        print(f"❌ Error calculating expectancy: {e}")
+        return 0.0
+
 # ==================== ROUTES ====================
 
 @app.route('/')
@@ -139,6 +243,9 @@ def get_metrics():
         car_over_mdd = 0.0
         sharpe = 0.0
         sortino = 0.0
+        longest_win_streak = 0
+        longest_loss_streak = 0
+        expectancy_multiple = 0.0
         
         if num_trades > 0 and trades is not None:
             trades = trades.dropna(subset=['profit_loss_amount'])
@@ -159,6 +266,11 @@ def get_metrics():
                     downside_std = downside_returns.std()
                     if downside_std > 0:
                         sortino = (returns.mean() / downside_std) * np.sqrt(252)
+                
+                # Calculate new metrics
+                longest_win_streak = calculate_longest_winning_streak(trades)
+                longest_loss_streak = calculate_longest_losing_streak(trades)
+                expectancy_multiple = calculate_expectancy_multiple(trades)
         
         metrics = {
             'backtest_start_date': start_date.strftime('%Y-%m-%d'),
@@ -175,6 +287,9 @@ def get_metrics():
             'sharpe': f"{sharpe:.2f}",
             'sortino': f"{sortino:.2f}",
             'avg_trade_pnl': f"₹{avg_trade_pnl:,.0f}",
+            'longest_win_streak': f"{int(longest_win_streak)}",
+            'longest_loss_streak': f"{int(longest_loss_streak)}",
+            'expectancy_multiple': f"{expectancy_multiple:.4f}",
         }
         
         return jsonify(metrics)
@@ -538,7 +653,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backtest Dashboard with Monte Carlo - V4.5</title>
+    <title>Backtest Dashboard with Monte Carlo - V4.6</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -684,7 +799,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="header">
         <h1>🎲 Backtest Dashboard with Monte Carlo</h1>
-        <p>V4.5 - Enhanced with Performance Grid & Trade Distribution Labels</p>
+        <p>V4.6 - Enhanced with Advanced Trade Metrics</p>
     </div>
     
     <div class="container">
@@ -805,7 +920,7 @@ HTML_TEMPLATE = """
                         return;
                     }
                     let html = '';
-                    const order = ['backtest_start_date', 'backtest_end_date', 'duration_years', 'initial_equity', 'final_equity', 'cagr', 'max_dd', 'max_dd_duration_days', 'number_of_trades', 'win_rate', 'car_over_mdd', 'sharpe', 'sortino', 'avg_trade_pnl'];
+                    const order = ['backtest_start_date', 'backtest_end_date', 'duration_years', 'initial_equity', 'final_equity', 'cagr', 'max_dd', 'max_dd_duration_days', 'number_of_trades', 'win_rate', 'car_over_mdd', 'sharpe', 'sortino', 'avg_trade_pnl', 'longest_win_streak', 'longest_loss_streak', 'expectancy_multiple'];
                     
                     order.forEach(key => {
                         if (key in data) {
