@@ -4,3 +4,6 @@
 *.pyc
 *.png
 Data/temp/monte_carlo_results.pkl
+src/__pycache__/GetFreshMarketData.cpython-314.pyc
+/src/__pycache__
+*.pyc
